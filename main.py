@@ -39,11 +39,9 @@ parser.add_argument('--epochs', default=40, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
+parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N',
-                    help='mini-batch size (default: 256), this is the total '
-                         'batch size of all GPUs on the current node when '
-                         'using Data Parallel or Distributed Data Parallel')
+                    help='mini-batch size (default: 128)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
@@ -86,8 +84,15 @@ parser.add_argument('--dataset', type=str, default='cifar100',
 
 
 def main():
+    # fp16 precision for speed
+    torch.set_float32_matmul_precision('medium')
+
     args = parser.parse_args()
 
+    # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
+    # args.dataset = 'imagenet'
+    # args.workers = 8
+    # args.arch = 'resnet50'
     # args.resume = 'checkpoint/epoch=2-val_loss=3.24-val_acc1=0.21.ckpt'
 
     os.makedirs(args.save_dir, exist_ok=True)
@@ -117,31 +122,7 @@ def main():
     train(args, logger)
 
 
-def train(args, logger):
-    dataset_to_classes = {
-        'cifar100': 100,
-        'imagenet': 1000,
-        'cub': 200,
-        'aircraft': 100,
-        'flowers': 102,
-        'cars': 196,
-        'in9l': 9
-    }
-    num_classes = dataset_to_classes[args.dataset]
-
-    # create model
-    if args.resume:
-        print("\nLoading checkpoint '{}'\n".format(args.resume))
-        model = ImageClassificationModel.load_from_checkpoint(args.resume)
-    else:
-        model = ImageClassificationModel(
-            pretrained=args.pretrained, arch=args.arch, logger=logger, lr=args.lr,
-            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
-        )
-    logger.info(model)
-
-    cudnn.benchmark = True
-
+def create_dataloaders(args):
     # Data loading code
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
@@ -166,29 +147,63 @@ def train(args, logger):
         ]))
 
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True,
+        train_dataset,
+        batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True,
         persistent_workers=True,
     )
 
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
+    val_dataset = datasets.ImageFolder(
+        valdir,
+        transforms.Compose([
+            transforms.Resize(256),  # why would this be here?
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
-        ])),
+        ])
+    )
+
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True,
         persistent_workers=True,
     )
+    return train_loader, val_loader
+
+
+def train(args, logger):
+    dataset_to_classes = {
+        'cifar100': 100,
+        'imagenet': 1000,
+        'cub': 200,
+        'aircraft': 100,
+        'flowers': 102,
+        'cars': 196,
+        'in9l': 9
+    }
+    num_classes = dataset_to_classes[args.dataset]
+
+    if args.resume:
+        print("\nLoading checkpoint '{}'\n".format(args.resume))
+        model = ImageClassificationModel.load_from_checkpoint(args.resume)
+    else:
+        model = ImageClassificationModel(
+            pretrained=args.pretrained, arch=args.arch, logger=logger, lr=args.lr,
+            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
+        )
+    logger.info(model)
+
+    cudnn.benchmark = True
+
+    train_loader, val_loader = create_dataloaders(args)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.save_dir,
         save_top_k=1,
         monitor='val_loss',
         mode='min',
-        filename='{epoch}-{val_loss:.2f}-{val_acc1:.2f}',
+        filename=f'{args.dataset}-{args.arch}-' + '{epoch}-{val_loss:.2f}-{val_acc1:.2f}',
     )
 
     trainer = pl.Trainer(
