@@ -1,10 +1,7 @@
 import torch
 from torch import nn
+from models.mm_loss import ManifoldMatchingLoss
 
-import torch
-import torch.nn as nn
-
-from mm_loss import ManifoldMatchingLoss
 
 # Adapted from https://github.com/gpeyre/SinkhornAutoDiff
 class SinkhornDistance(nn.Module):
@@ -105,7 +102,7 @@ class SinkhornDistance(nn.Module):
         C = prod / norm
         eps = 1e-6
         if squared:
-            C.diag == 0
+            C.diag == 0  # todo: what is this for?
             return C.clamp(min=eps)
         else:
             C = C.clamp(min=eps).sqrt()
@@ -143,6 +140,7 @@ class LICOLoss(nn.Module):
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
 
     def forward(self, y, t, features_visual, features_text):
+        # todo: are y and t - predictions and targets?
         batch_size = y.shape[0]
         
         # features_visual is F with shape (batch_size, num_channels, d_prime)
@@ -166,7 +164,6 @@ class LICOLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    #torch.cuda.set_device(4)
     y = torch.randn(10, 5).cuda()
     t = torch.randn(10, 5).cuda()
 

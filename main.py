@@ -17,8 +17,9 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
+from models.LICO_model import LICOModel, tokenize_targets
 from models.image_model import ImageClassificationModel
-from training_utils import get_logger
+from training_utils import get_logger, DATASETS_TO_CLASSES, TEXT_CLASSES
 
 
 model_names = sorted(name for name in models.__dict__
@@ -26,6 +27,8 @@ model_names = sorted(name for name in models.__dict__
     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+parser.add_argument('--training-method', type=str, default='baseline',
+                    choices=['baseline', 'LICO'])
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
@@ -89,6 +92,7 @@ def main():
 
     args = parser.parse_args()
 
+    args.training_method = 'LICO'
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
@@ -119,7 +123,7 @@ def main():
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 
-    train(args, logger)
+    train(args)
 
 
 def create_dataloaders(args):
@@ -127,8 +131,9 @@ def create_dataloaders(args):
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
     if args.dataset == 'cifar100':
-        from download_datasets import download_and_prepare_cifar100
-        download_and_prepare_cifar100(args.data)
+        if not os.path.exists(os.path.join(args.data, 'train')):
+            from download_datasets import download_and_prepare_cifar100
+            download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
 
     elif args.dataset == 'imagenet':
@@ -172,29 +177,39 @@ def create_dataloaders(args):
     return train_loader, val_loader
 
 
-def train(args, logger):
-    dataset_to_classes = {
-        'cifar100': 100,
-        'imagenet': 1000,
-        'cub': 200,
-        'aircraft': 100,
-        'flowers': 102,
-        'cars': 196,
-        'in9l': 9
-    }
-    num_classes = dataset_to_classes[args.dataset]
+def make_model(args):
+    num_classes = DATASETS_TO_CLASSES[args.dataset]
 
-    if args.resume:
-        print("\nLoading checkpoint '{}'\n".format(args.resume))
-        model = ImageClassificationModel.load_from_checkpoint(args.resume)
-    else:
-        model = ImageClassificationModel(
-            pretrained=args.pretrained, arch=args.arch, logger=logger, lr=args.lr,
+    if args.training_method == 'baseline':
+        if args.resume:
+            print("\nLoading checkpoint '{}'\n".format(args.resume))
+            model = ImageClassificationModel.load_from_checkpoint(args.resume)
+        else:
+            model = ImageClassificationModel(
+                pretrained=args.pretrained, arch=args.arch, lr=args.lr,
+                momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
+            )
+    elif args.training_method == 'LICO':
+        image_model = ImageClassificationModel(
+            pretrained=args.pretrained, arch=args.arch, lr=args.lr,
             momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
         )
-    logger.info(model)
+        target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
+        model = LICOModel(image_model, target_names=target_names)
+    else:
+        raise NotImplementedError
+    return model
 
+
+def train(args):
+    print(f"Starting training with the following configuration:\n"
+          f" - Dataset: {args.dataset} (Path: {args.data})\n"
+          f" - Architecture: {args.arch}\n"
+          f" - Training Method: {args.training_method}\n"
+          + (f" - Resuming from checkpoint: {args.resume}" if args.resume else ""))
     cudnn.benchmark = True
+
+    model = make_model(args)
 
     train_loader, val_loader = create_dataloaders(args)
 
@@ -203,7 +218,7 @@ def train(args, logger):
         save_top_k=1,
         monitor='val_loss',
         mode='min',
-        filename=f'{args.dataset}-{args.arch}-' + '{epoch}-{val_loss:.2f}-{val_acc1:.2f}',
+        filename=f'{args.training_method}-{args.dataset}-{args.arch}-' + '{epoch}-{val_loss:.2f}-{val_acc1:.2f}',
     )
 
     trainer = pl.Trainer(
@@ -213,7 +228,7 @@ def train(args, logger):
         logger=TensorBoardLogger(save_dir='./'),
     )
 
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, train_loader) #, val_loader)
 
 
 if __name__ == '__main__':
