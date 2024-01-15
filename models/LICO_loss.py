@@ -4,6 +4,7 @@ from torch import nn
 import torch
 import torch.nn as nn
 
+from mm_loss import ManifoldMatchingLoss
 
 # Adapted from https://github.com/gpeyre/SinkhornAutoDiff
 class SinkhornDistance(nn.Module):
@@ -133,20 +134,28 @@ class LICOLoss(nn.Module):
         self.alpha = alpha
         self.beta = beta
         self.reduction = reduction
+        
+        def euclidean_distance(x, y):
+            return torch.norm(x - y, p=2)
 
         self.ce_loss = nn.CrossEntropyLoss(reduction='none')
-        self.mm_loss = None
+        self.mm_loss = ManifoldMatchingLoss(distance_fn=euclidean_distance)
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
 
     def forward(self, y, t, features_visual, features_text):
         batch_size = y.shape[0]
+        
+        # features_visual is F with shape (batch_size, num_channels, d_prime)
+        # features_text is G with shape (batch_size, prompt_size, d_prime)
+        assert len(features_visual.shape) == 3
+        assert len(features_text.shape) == 3
 
         total_loss = self.ce_loss(y, t)
         if self.alpha != 0:
             mm_loss = self.mm_loss(features_visual, features_text)
             total_loss = total_loss + self.alpha * mm_loss
         if self.beta != 0:
-            ot_loss, _, _ = self.ot_loss(features_visual.unsqueeze(-1), features_text.unsqueeze(-1))
+            ot_loss, _, _ = self.ot_loss(features_visual, features_text)
             total_loss = total_loss + self.beta * ot_loss
 
         if self.reduction == 'mean':
@@ -161,11 +170,9 @@ if __name__ == '__main__':
     y = torch.randn(10, 5).cuda()
     t = torch.randn(10, 5).cuda()
 
-    features_visual = torch.randn(10, 10).cuda()
-    features_text = torch.randn(10, 10).cuda()
+    features_visual = torch.randn(10, 2, 10).cuda()
+    features_text = torch.randn(10, 5, 10).cuda()
 
-    criterion = LICOLoss(alpha=0.0, beta=1.0)
+    criterion = LICOLoss(alpha=1.0, beta=1.0)
     loss = criterion(y, t, features_visual, features_text)
     print(loss)
-
-
