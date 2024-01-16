@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import torch
 from torch.utils.data.sampler import Sampler
-from torchvision import transforms, datasets
+from torchvision import transforms
 from PIL import Image
 
 
