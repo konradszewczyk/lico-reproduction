@@ -8,22 +8,30 @@ from training_utils import accuracy
 
 
 class ImageClassificationModel(pl.LightningModule):
-    def __init__(self, pretrained, arch, logger, lr, momentum, weight_decay, num_classes):
+    def __init__(self, pretrained, arch, lr, momentum, weight_decay, num_classes):
         super().__init__()
-        if pretrained:
-            # print("=> using pre-trained model '{}'".format(args.arch))
-            logger.info("=> using pre-trained model '{}'".format(arch))
-            self.model = models.__dict__[arch](pretrained=True)
-        else:
-            # print("=> creating model '{}'".format(args.arch))
-            logger.info("=> creating model '{}'".format(arch))
-            self.model = models.__dict__[arch]()
+
+        class Identity(nn.Module):
+            def __init__(self):
+                super(Identity, self).__init__()
+
+            def forward(self, x):
+                return x
+
+        print(f"=> {'using pre-trained' if pretrained else 'creating'} model {arch}")
+        self._model = models.__dict__[arch](pretrained=pretrained)
 
         # Modify the final layer based on the architecture
+        # we will use the penultimate layer's outputs for feature extraction
+        self._model.fc = Identity()
+
+        # and this one will be for classification
         if arch == 'resnet18':
-            self.model.fc = nn.Linear(512, num_classes)
+            self.feature_dim = 512
         elif arch == 'resnet50':
-            self.model.fc = nn.Linear(2048, num_classes)
+            self.feature_dim = 2048
+
+        self._actual_fc = nn.Linear(self.feature_dim, num_classes)
 
         self.criterion = nn.CrossEntropyLoss()
         self.lr = lr
@@ -37,7 +45,17 @@ class ImageClassificationModel(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        return self.model(x)
+        return self._actual_fc(self._model(x))
+
+    def features_forward(self, x) -> (torch.Tensor, torch.Tensor):
+        """
+        Returns the features of the penultimate layer and the logits
+        """
+        features = self._model(x)
+        # not detaching features because we need to compute the CE loss on them through logits
+        # the MM and OT loss will also affect features, bypassing the logits
+        logits = self._actual_fc(features)
+        return features, logits
 
     def training_step(self, batch, batch_idx):
         images, target = batch
@@ -58,9 +76,11 @@ class ImageClassificationModel(pl.LightningModule):
         return {'val_loss': loss, 'val_acc1': acc1, 'val_acc5': acc5}
 
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.model.parameters(), self.lr,
+        optimizer = torch.optim.SGD(self._model.parameters(), self.lr,
                                     momentum=self.momentum,
                                     weight_decay=self.weight_decay)
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
         return [optimizer], [lr_scheduler]
-        # {"scheduler": scheduler, "interval": "epoch"}
+
+    def get_feature_dim(self):
+        return self.feature_dim
