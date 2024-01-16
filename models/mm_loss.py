@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class ManifoldMatchingLoss(nn.Module):
@@ -12,10 +13,10 @@ class ManifoldMatchingLoss(nn.Module):
             temperature (float): Adjacent matrix temperature
         """
         super(ManifoldMatchingLoss, self).__init__()
-        self.kl_loss = nn.KLDivLoss(reduction=reduction)
         self.norm_order = norm_order
+        self.reduction = reduction
         # Trainable temperature
-        self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float32))
+        self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float16))
     
     def create_adjacent_matrix(self, feats):
         """Create adjacent matrix from a matrix of features
@@ -34,7 +35,7 @@ class ManifoldMatchingLoss(nn.Module):
         pairwise_diff = feats.unsqueeze(0) - feats.unsqueeze(1)
         pairwise_dist = torch.linalg.vector_norm(pairwise_diff, ord=self.norm_order, dim=-1)
         pre_softmax = -pairwise_dist / self.temperature
-        A = torch.nn.functional.softmax(pre_softmax, dim=1)
+        A = F.log_softmax(pre_softmax, dim=1)
         
         return A
 
@@ -63,10 +64,9 @@ class ManifoldMatchingLoss(nn.Module):
 
         # MM loss
         # - KL(A_g || A_f) is input as kl_div(A_f, A_g) according to https://pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html
-        # - "this loss expects the argument input in the log-space" -> hence A_f.log()
-        # - KL loss already performs mean reduction across minibatch
-        mm_loss = self.kl_loss(A_f.log(), A_g)
-        mm_loss = mm_loss.mean(dim=1)
+        # - "this loss expects the argument input in the log-space"
+        mm_loss = F.kl_div(A_f, A_g, log_target=True, reduction=self.reduction)
+        mm_loss = mm_loss.sum(dim=1)
         return mm_loss
 
 
@@ -75,8 +75,8 @@ if __name__ == '__main__':
     # y = torch.randn(10, 5).cuda()
     # t = torch.randn(10, 5).cuda()
 
-    features_visual = torch.randn(10, 3, 10).cuda().half()
-    features_text = torch.randn(10, 2, 10).cuda().half()
+    features_visual = torch.randn(20, 3, 10).cuda().half()
+    features_text = torch.randn(20, 2, 10).cuda().half()
 
     criterion = ManifoldMatchingLoss(norm_order=2)
     loss = criterion(features_visual, features_text)
