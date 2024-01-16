@@ -139,7 +139,7 @@ class LICOLoss(nn.Module):
             return torch.norm(x - y, p=2)
 
         self.ce_loss = nn.CrossEntropyLoss(reduction='none')
-        self.mm_loss = ManifoldMatchingLoss(distance_fn=euclidean_distance)
+        self.mm_loss = ManifoldMatchingLoss(norm_order=2)
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
 
     def forward(self, y, t, features_visual, features_text):
@@ -170,8 +170,8 @@ if __name__ == '__main__':
     y = torch.randn(10, 5).cuda()
     t = torch.randn(10, 5).cuda()
 
-    features_visual = torch.randn(10, 2, 10).cuda()
-    features_text = torch.randn(10, 5, 10).cuda()
+    features_visual = torch.randn(10, 2, 10).cuda().half()
+    features_text = torch.randn(10, 5, 10).cuda().half()
 
     criterion = LICOLoss(alpha=1.0, beta=1.0)
     loss = criterion(y, t, features_visual, features_text)
