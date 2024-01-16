@@ -10,16 +10,13 @@ def preprocess_image(img: np.ndarray, mean=None, std=None) -> torch.Tensor:
     if mean is None:
         mean = [0.5, 0.5, 0.5]
 
-    preprocessing = Compose([
-        ToTensor(),
-        Normalize(mean=mean, std=std)
-    ])
+    preprocessing = Compose([ToTensor(), Normalize(mean=mean, std=std)])
 
     return preprocessing(img.copy()).unsqueeze(0)
 
 
 def deprocess_image(img):
-    """ see https://github.com/jacobgil/keras-grad-cam/blob/master/grad-cam.py#L65 """
+    """see https://github.com/jacobgil/keras-grad-cam/blob/master/grad-cam.py#L65"""
     img = img - np.mean(img)
     img = img / (np.std(img) + 1e-5)
     img = img * 0.1
@@ -28,11 +25,13 @@ def deprocess_image(img):
     return np.uint8(img * 255)
 
 
-def show_cam_on_image(img: np.ndarray,
-                      mask: np.ndarray,
-                      use_rgb: bool = False,
-                      colormap: int = cv2.COLORMAP_JET) -> np.ndarray:
-    """ This function overlays the cam mask on the image as an heatmap.
+def show_cam_on_image(
+    img: np.ndarray,
+    mask: np.ndarray,
+    use_rgb: bool = False,
+    colormap: int = cv2.COLORMAP_JET,
+) -> np.ndarray:
+    """This function overlays the cam mask on the image as an heatmap.
     By default the heatmap is in BGR format.
 
     :param img: The base image in RGB or BGR format.
