@@ -1,7 +1,5 @@
-import cv2
 import numpy as np
-import torch
-from pytorch_grad_cam.base_cam import BaseCAM
+from base_cam import BaseCAM
 
 
 class GradCAM(BaseCAM):

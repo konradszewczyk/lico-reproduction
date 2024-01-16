@@ -1,6 +1,4 @@
-import cv2
 import numpy as np
-import torch
 from base_cam import BaseCAM
 
 

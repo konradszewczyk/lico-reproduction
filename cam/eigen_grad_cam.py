@@ -1,8 +1,5 @@
-import cv2
-import numpy as np
-import torch
-from pytorch_grad_cam.base_cam import BaseCAM
-from pytorch_grad_cam.utils.svd_on_activations import get_2d_projection
+from base_cam import BaseCAM
+from utils.svd_on_activations import get_2d_projection
 
 
 # Like Eigen CAM: https://arxiv.org/abs/2008.00299

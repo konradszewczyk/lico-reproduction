@@ -1,5 +1,3 @@
-import cv2
-import numpy as np
 import torch
 import tqdm
 from base_cam import BaseCAM
