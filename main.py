@@ -216,9 +216,9 @@ def train(args):
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.save_dir,
         save_top_k=1,
-        monitor='val_loss',
+        monitor='train_loss',
         mode='min',
-        filename=f'{args.training_method}-{args.dataset}-{args.arch}-' + '{epoch}-{val_loss:.2f}-{val_acc1:.2f}',
+        filename=f'{args.training_method}-{args.dataset}-{args.arch}-' + '{epoch}-{train_loss:.2f}-{val_loss:.2f}-{val_acc1:.2f}',
     )
 
     trainer = pl.Trainer(

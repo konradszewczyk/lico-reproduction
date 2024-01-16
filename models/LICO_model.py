@@ -67,8 +67,10 @@ class LICOModel(pl.LightningModule):
         projected_text_features = projected_text_features.view(projected_text_features.shape[0], 1, projected_text_features.shape[1])
         loss = self.criterion(img_logits, target, img_features, projected_text_features)
 
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
+
+    # todo: add validation_step and test_step
 
     def configure_optimizers(self):
         # todo: add the trainable prompts to the optimizer
