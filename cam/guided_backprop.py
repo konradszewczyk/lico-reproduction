@@ -7,7 +7,9 @@ class GuidedBackpropReLU(Function):
     @staticmethod
     def forward(self, input_img):
         positive_mask = (input_img > 0).type_as(input_img)
-        output = torch.addcmul(torch.zeros(input_img.size()).type_as(input_img), input_img, positive_mask)
+        output = torch.addcmul(
+            torch.zeros(input_img.size()).type_as(input_img), input_img, positive_mask
+        )
         self.save_for_backward(input_img, output)
         return output
 
@@ -18,9 +20,15 @@ class GuidedBackpropReLU(Function):
 
         positive_mask_1 = (input_img > 0).type_as(grad_output)
         positive_mask_2 = (grad_output > 0).type_as(grad_output)
-        grad_input = torch.addcmul(torch.zeros(input_img.size()).type_as(input_img),
-                                   torch.addcmul(torch.zeros(input_img.size()).type_as(input_img), grad_output,
-                                                 positive_mask_1), positive_mask_2)
+        grad_input = torch.addcmul(
+            torch.zeros(input_img.size()).type_as(input_img),
+            torch.addcmul(
+                torch.zeros(input_img.size()).type_as(input_img),
+                grad_output,
+                positive_mask_1,
+            ),
+            positive_mask_2,
+        )
         return grad_input
 
 
@@ -38,7 +46,7 @@ class GuidedBackpropReLUModel:
     def recursive_replace_relu_with_guidedrelu(self, module_top):
         for idx, module in module_top._modules.items():
             self.recursive_replace_relu_with_guidedrelu(module)
-            if module.__class__.__name__ == 'ReLU':
+            if module.__class__.__name__ == "ReLU":
                 module_top._modules[idx] = GuidedBackpropReLU.apply
 
     def recursive_replace_guidedrelu_with_relu(self, module_top):
@@ -49,7 +57,6 @@ class GuidedBackpropReLUModel:
                     module_top._modules[idx] = torch.nn.ReLU()
         except:
             pass
-
 
     def __call__(self, input_img, target_category=None):
         # replace ReLU with GuidedBackpropReLU
