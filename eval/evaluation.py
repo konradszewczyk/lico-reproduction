@@ -1,4 +1,3 @@
-from torch import nn
 from tqdm import tqdm
 from scipy.ndimage.filters import gaussian_filter
 
