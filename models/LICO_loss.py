@@ -134,12 +134,9 @@ class LICOLoss(nn.Module):
         self.alpha = alpha
         self.beta = beta
         self.reduction = reduction
-        
-        def euclidean_distance(x, y):
-            return torch.norm(x - y, p=2)
 
         self.ce_loss = nn.CrossEntropyLoss(reduction='none')
-        self.mm_loss = ManifoldMatchingLoss(norm_order=2)
+        self.mm_loss = ManifoldMatchingLoss(norm_order=2, reduction='none')
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
 
     def forward(self, y, t, features_visual, features_text):

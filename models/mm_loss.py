@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 class ManifoldMatchingLoss(nn.Module):
-    def __init__(self, norm_order=2):
+    def __init__(self, norm_order=2, reduction='none'):
         """Manifold matching loss from LICO
 
         Args:
@@ -12,7 +12,7 @@ class ManifoldMatchingLoss(nn.Module):
             temperature (float): Adjacent matrix temperature
         """
         super(ManifoldMatchingLoss, self).__init__()
-        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
+        self.kl_loss = nn.KLDivLoss(reduction=reduction)
         self.norm_order = norm_order
         # Trainable temperature
         self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float32))
@@ -35,7 +35,7 @@ class ManifoldMatchingLoss(nn.Module):
         pairwise_dist = torch.linalg.vector_norm(pairwise_diff, ord=self.norm_order, dim=-1)
         pre_softmax = -pairwise_dist / self.temperature
         A = torch.nn.functional.softmax(pre_softmax, dim=1)
-
+        
         return A
 
     def forward(self, image_feats, lang_feats):
@@ -66,6 +66,7 @@ class ManifoldMatchingLoss(nn.Module):
         # - "this loss expects the argument input in the log-space" -> hence A_f.log()
         # - KL loss already performs mean reduction across minibatch
         mm_loss = self.kl_loss(A_f.log(), A_g)
+        mm_loss = mm_loss.mean(dim=1)
         return mm_loss
 
 
