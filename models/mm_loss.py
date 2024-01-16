@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 class ManifoldMatchingLoss(nn.Module):
-    def __init__(self, distance_fn):
+    def __init__(self, norm_order=2, reduction='none'):
         """Manifold matching loss from LICO
 
         Args:
@@ -12,9 +12,8 @@ class ManifoldMatchingLoss(nn.Module):
             temperature (float): Adjacent matrix temperature
         """
         super(ManifoldMatchingLoss, self).__init__()
-        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
-        self.softmax = nn.Softmax(dim=1)
-        self.distance_fn = distance_fn
+        self.kl_loss = nn.KLDivLoss(reduction=reduction)
+        self.norm_order = norm_order
         # Trainable temperature
         self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float32))
     
@@ -27,16 +26,16 @@ class ManifoldMatchingLoss(nn.Module):
         Returns:
             torch.tensor: Adjacent matrix
         """
+        
         batch_size = feats.shape[0]
-        exponents_mat = torch.zeros(batch_size, batch_size)
-        # Compute input to softmax
-        for i in range(batch_size):
-            for j in range(batch_size):
-                dist_ij = self.distance_fn(feats[i], feats[j])
-                exponent = -dist_ij / self.temperature
-                exponents_mat[i, j] = exponent
-        # Softmax across dim=1
-        A = self.softmax(exponents_mat)
+        # Flatten
+        feats = feats.view(batch_size, -1)
+        # Pairwise distance
+        pairwise_diff = feats.unsqueeze(0) - feats.unsqueeze(1)
+        pairwise_dist = torch.linalg.vector_norm(pairwise_diff, ord=self.norm_order, dim=-1)
+        pre_softmax = -pairwise_dist / self.temperature
+        A = torch.nn.functional.softmax(pre_softmax, dim=1)
+        
         return A
 
     def forward(self, image_feats, lang_feats):
@@ -67,6 +66,7 @@ class ManifoldMatchingLoss(nn.Module):
         # - "this loss expects the argument input in the log-space" -> hence A_f.log()
         # - KL loss already performs mean reduction across minibatch
         mm_loss = self.kl_loss(A_f.log(), A_g)
+        mm_loss = mm_loss.mean(dim=1)
         return mm_loss
 
 
@@ -75,12 +75,9 @@ if __name__ == '__main__':
     # y = torch.randn(10, 5).cuda()
     # t = torch.randn(10, 5).cuda()
 
-    features_visual = torch.randn(10, 10).cuda()
-    features_text = torch.randn(10, 10).cuda()
-    
-    def euclidean_distance(x, y):
-        return torch.norm(x - y, p=2)
+    features_visual = torch.randn(10, 3, 10).cuda().half()
+    features_text = torch.randn(10, 2, 10).cuda().half()
 
-    criterion = ManifoldMatchingLoss(distance_fn=euclidean_distance)
+    criterion = ManifoldMatchingLoss(norm_order=2)
     loss = criterion(features_visual, features_text)
     print(loss)
