@@ -112,16 +112,20 @@ if __name__ == '__main__':
     # y = torch.randn(10, 5).cuda()
     # t = torch.randn(10, 5).cuda()
     
-    features_visual = torch.randn(20, 3, 10).cuda().half()
-    features_text = torch.randn(20, 2, 10).cuda().half()
+    for i in range(1000):
+        features_visual = torch.randn(256, 6, 768).cuda().half()
+        features_text = torch.randn(256, 12, 768).cuda().half()
 
-    features_visual.requires_grad = True
+        features_visual.requires_grad = True
 
-    loss_lico = ManifoldMatchingLoss(implementation='lico')(features_visual, features_text)
-    loss_ours = ManifoldMatchingLoss(implementation='ours')(features_visual, features_text)
-    
-    print(f"{loss_lico}\n{loss_ours}\n{loss_lico - loss_ours}")
-    if torch.allclose(loss_lico, loss_ours, rtol=0.01): 
-        print("Lico and our implementations match")
-    else:
-        print(f"LICO and our loss should give the same result, but don't")
+        loss_lico = ManifoldMatchingLoss(implementation='lico')(features_visual, features_text)
+        loss_ours = ManifoldMatchingLoss(implementation='ours')(features_visual, features_text)
+
+        # print(f"{loss_lico}\n{loss_ours}\n{loss_lico - loss_ours}")
+        # print(f'max_difference: {(loss_lico - loss_ours).abs().max()}')
+        if torch.allclose(loss_lico, loss_ours, rtol=0.01):
+            # print("Lico and our implementations match")
+            pass
+        else:
+            print(f"LICO and our loss should give the same result, but don't")
+            print(f'max_difference: {(loss_lico - loss_ours).abs().max()}')

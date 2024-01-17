@@ -9,7 +9,7 @@ from training_utils import accuracy
 
 
 class LICOModel(pl.LightningModule):
-    def __init__(self, image_model, target_names: torch.tensor):
+    def __init__(self, image_model, target_names: torch.tensor, alpha, beta):
         """
         :param image_model: the image model to use for feature extraction nad classification
             has to implement features_forward() method that gives features and logits
@@ -32,7 +32,7 @@ class LICOModel(pl.LightningModule):
             nn.Linear(768, self.image_model.get_feature_dim(), dtype=torch.float16)
         )  # h
 
-        self.criterion = LICOLoss(reduction='mean', beta=0)
+        self.criterion = LICOLoss(alpha, beta, reduction='mean')
         
         # self.criterion = LICOLoss(reduction='mean')
         # hyperparameter
@@ -72,11 +72,14 @@ class LICOModel(pl.LightningModule):
             # raise ValueError("Image features contain NaN values.")
         # if torch.isnan(projected_text_features).any():
             # raise ValueError("Text features contain NaN values.")
-        loss = self.criterion(img_logits, target, img_features, projected_text_features)
+        loss, mm_part, ot_part = self.criterion(img_logits, target, img_features, projected_text_features)
         # if torch.isnan(projected_text_features).any():
             # raise ValueError("Loss output contains NaN values.")
 
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('train_mm_part', mm_part)
+        self.log('train_ot_part', ot_part)
+        self.log('mm_loss_temperature', self.criterion.mm_loss.temperature)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -91,9 +94,11 @@ class LICOModel(pl.LightningModule):
         img_features = img_features.view(img_features.shape[0], 1, img_features.shape[1])
         projected_text_features = projected_text_features.view(projected_text_features.shape[0], 1,
                                                                projected_text_features.shape[1])
-        loss = self.criterion(img_logits, target, img_features, projected_text_features)
+        loss, mm_part, ot_part = self.criterion(img_logits, target, img_features, projected_text_features)
         acc1, acc5 = accuracy(img_logits, target, topk=(1, 5))
         self.log('val_loss', loss)
+        self.log('val_mm_part', mm_part)
+        self.log('val_ot_part', ot_part)
         self.log('val_acc1', acc1, on_step=False, on_epoch=True, prog_bar=True)
         self.log('val_acc5', acc5)
         return {'val_loss': loss, 'val_acc1': acc1, 'val_acc5': acc5}

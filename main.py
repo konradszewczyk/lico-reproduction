@@ -15,7 +15,7 @@ import torchvision.models as models
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 from models.LICO_model import LICOModel, tokenize_targets
 from models.image_model import ImageClassificationModel
@@ -29,6 +29,8 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--training-method', type=str, default='baseline',
                     choices=['baseline', 'LICO'])
+parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO loss')
+parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
@@ -93,6 +95,8 @@ def main():
     args = parser.parse_args()
 
     args.training_method = 'LICO'
+    args.beta = 0.0
+    args.epochs = 10
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
@@ -195,7 +199,7 @@ def make_model(args):
             momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
         )
         target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
-        model = LICOModel(image_model, target_names=target_names)
+        model = LICOModel(image_model, target_names=target_names, alpha=args.alpha, beta=args.beta)
     else:
         raise NotImplementedError
     return model
@@ -206,6 +210,7 @@ def train(args):
           f" - Dataset: {args.dataset} (Path: {args.data})\n"
           f" - Architecture: {args.arch}\n"
           f" - Training Method: {args.training_method}\n"
+          + f" - Alpha: {args.alpha}\n - Beta: {args.beta}\n" if (args.training_method == 'LICO') else ""
           + (f" - Resuming from checkpoint: {args.resume}" if args.resume else ""))
     cudnn.benchmark = True
 
@@ -225,7 +230,7 @@ def train(args):
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback],
         enable_progress_bar=True,
-        logger=TensorBoardLogger(save_dir='./'),
+        logger=WandbLogger(project="lico-reproduction", log_model="all"),
     )
 
     trainer.fit(model, train_loader, val_loader)
