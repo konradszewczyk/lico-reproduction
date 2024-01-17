@@ -32,7 +32,8 @@ class LICOModel(pl.LightningModule):
             nn.Linear(768, self.image_model.get_feature_dim(), dtype=torch.float16)
         )  # h
 
-        self.criterion = LICOLoss(reduction='mean')
+        self.criterion = LICOLoss(reduction='mean', alpha=10, beta=0)
+        # self.criterion = LICOLoss(reduction='mean')
         # hyperparameter
         self.M = 10
 
@@ -66,7 +67,13 @@ class LICOModel(pl.LightningModule):
         # so for now its 1
         img_features = img_features.view(img_features.shape[0], 1, img_features.shape[1])
         projected_text_features = projected_text_features.view(projected_text_features.shape[0], 1, projected_text_features.shape[1])
+        # if torch.isnan(img_features).any():
+            # raise ValueError("Image features contain NaN values.")
+        # if torch.isnan(projected_text_features).any():
+            # raise ValueError("Text features contain NaN values.")
         loss = self.criterion(img_logits, target, img_features, projected_text_features)
+        # if torch.isnan(projected_text_features).any():
+            # raise ValueError("Loss output contains NaN values.")
 
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss

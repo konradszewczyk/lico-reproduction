@@ -133,7 +133,7 @@ class LICOLoss(nn.Module):
         self.reduction = reduction
 
         self.ce_loss = nn.CrossEntropyLoss(reduction='none')
-        self.mm_loss = ManifoldMatchingLoss(reduction='none')
+        self.mm_loss = ManifoldMatchingLoss(reduction='none', implementation='ours')
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
 
     def forward(self, y, t, features_visual, features_text):

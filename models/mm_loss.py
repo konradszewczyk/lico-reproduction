@@ -1,3 +1,4 @@
+from sys import implementation
 import numpy as np
 import torch
 import torch.nn as nn
@@ -5,16 +6,17 @@ import torch.nn.functional as F
 
 
 class ManifoldMatchingLoss(nn.Module):
-    def __init__(self, distance_type='euc', reduction='none'):
+    def __init__(self, distance_type='euc', reduction='none', implementation='ours'):
         """Manifold matching loss from LICO
         """
         super(ManifoldMatchingLoss, self).__init__()
         self.reduction = reduction
         self.distance_type = distance_type
+        self.implementation = implementation
         # Trainable temperature
         self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float16))
     
-    def create_adjacent_matrix(self, feats, dist_type, normalize_feats=False):
+    def create_adjacent_matrix_ours(self, feats):
         """Create adjacent matrix from a matrix of features
 
         Args:
@@ -23,7 +25,27 @@ class ManifoldMatchingLoss(nn.Module):
         Returns:
             torch.tensor: Adjacent matrix
         """
+        batch_size = feats.shape[0]
+        # Flatten
+        feats = feats.view(batch_size, -1)
+        # Pairwise distances
+        pairwise_diff = feats.unsqueeze(0) - feats.unsqueeze(1)
+        pairwise_eucl = torch.linalg.vector_norm(pairwise_diff, ord=2, dim=-1)
+        pre_softmax = -pairwise_eucl / self.temperature
         
+        A = F.log_softmax(pre_softmax, dim=1)
+        
+        return A
+    
+    def create_adjacent_matrix_lico(self, feats, dist_type, normalize_feats=False):
+        """Create adjacent matrix from a matrix of features
+
+        Args:
+            feats (torch.tensor): Features
+        
+        Returns:
+            torch.tensor: Adjacent matrix
+        """
         batch_size = feats.shape[0]
         # Flatten
         feats = feats.view(batch_size, -1)
@@ -34,6 +56,7 @@ class ManifoldMatchingLoss(nn.Module):
         # Squared norms of all the features
         sq_norm = prod.diag().unsqueeze(1).expand_as(prod)
         
+        # eps = 1e-4
         if dist_type == 'euc':
             dists = (sq_norm + sq_norm.t() - 2 * prod).sqrt()
         elif dist_type == 'cos':
@@ -41,10 +64,9 @@ class ManifoldMatchingLoss(nn.Module):
         else:
             raise Exception("Type should be 'euc' or 'cos'")
         
-        eps = 1e-4
-        dists = dists.clamp(min = eps)
+        # dists = dists.clamp(min = eps)
         
-        pre_softmax = -dists / self.temperature        
+        pre_softmax = -dists / self.temperature
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -69,9 +91,14 @@ class ManifoldMatchingLoss(nn.Module):
         assert len(lang_feats.shape) == 3
 
         # Adjacent matrices (eq. 1)
-        A_f = self.create_adjacent_matrix(image_feats, self.distance_type)
-        A_g = self.create_adjacent_matrix(lang_feats, self.distance_type)
-
+        if self.implementation == 'lico':
+            A_f = self.create_adjacent_matrix_lico(image_feats, self.distance_type)
+            A_g = self.create_adjacent_matrix_lico(lang_feats, self.distance_type)
+        elif self.implementation == 'ours':
+            A_f = self.create_adjacent_matrix_ours(image_feats)
+            A_g = self.create_adjacent_matrix_ours(lang_feats)
+        else:
+            raise Exception("Implementation should be either 'lico' or 'ours'")
         # MM loss
         # - KL(A_g || A_f) is input as kl_div(A_f, A_g) according to https://pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html
         # - "this loss expects the argument input in the log-space"
@@ -84,10 +111,17 @@ if __name__ == '__main__':
     #torch.cuda.set_device(4)
     # y = torch.randn(10, 5).cuda()
     # t = torch.randn(10, 5).cuda()
-
+    
     features_visual = torch.randn(20, 3, 10).cuda().half()
     features_text = torch.randn(20, 2, 10).cuda().half()
 
-    criterion = ManifoldMatchingLoss()
-    loss = criterion(features_visual, features_text)
-    print(loss)
+    features_visual.requires_grad = True
+
+    loss_lico = ManifoldMatchingLoss(implementation='lico')(features_visual, features_text)
+    loss_ours = ManifoldMatchingLoss(implementation='ours')(features_visual, features_text)
+    
+    print(f"{loss_lico}\n{loss_ours}\n{loss_lico - loss_ours}")
+    if torch.allclose(loss_lico, loss_ours, rtol=0.01): 
+        print("Lico and our implementations match")
+    else:
+        print(f"LICO and our loss should give the same result, but don't")
