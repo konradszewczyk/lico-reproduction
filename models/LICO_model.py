@@ -32,7 +32,8 @@ class LICOModel(pl.LightningModule):
             nn.Linear(768, self.image_model.get_feature_dim(), dtype=torch.float16)
         )  # h
 
-        self.criterion = LICOLoss(reduction='mean', alpha=10, beta=0)
+        self.criterion = LICOLoss(reduction='mean', beta=0)
+        
         # self.criterion = LICOLoss(reduction='mean')
         # hyperparameter
         self.M = 10
@@ -102,7 +103,7 @@ class LICOModel(pl.LightningModule):
     def configure_optimizers(self):
         # todo: add the trainable prompts to the optimizer
         optimizer = torch.optim.SGD(
-            list(self.image_model.parameters()) + list(self.projection_mlp.parameters()),
+            list(self.image_model.parameters()) + list(self.projection_mlp.parameters()) + list(self.criterion.parameters()),
             self.image_model.lr,
             momentum=self.image_model.momentum,
             weight_decay=self.image_model.weight_decay
