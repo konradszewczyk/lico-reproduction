@@ -5,20 +5,16 @@ import torch.nn.functional as F
 
 
 class ManifoldMatchingLoss(nn.Module):
-    def __init__(self, norm_order=2, reduction='none'):
+    def __init__(self, distance_type='euc', reduction='none'):
         """Manifold matching loss from LICO
-
-        Args:
-            distance_fn (callable): Computes the distance between features
-            temperature (float): Adjacent matrix temperature
         """
         super(ManifoldMatchingLoss, self).__init__()
-        self.norm_order = norm_order
         self.reduction = reduction
+        self.distance_type = distance_type
         # Trainable temperature
         self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float16))
     
-    def create_adjacent_matrix(self, feats):
+    def create_adjacent_matrix(self, feats, dist_type, normalize_feats=False):
         """Create adjacent matrix from a matrix of features
 
         Args:
@@ -31,10 +27,24 @@ class ManifoldMatchingLoss(nn.Module):
         batch_size = feats.shape[0]
         # Flatten
         feats = feats.view(batch_size, -1)
-        # Pairwise distance
-        pairwise_diff = feats.unsqueeze(0) - feats.unsqueeze(1)
-        pairwise_dist = torch.linalg.vector_norm(pairwise_diff, ord=self.norm_order, dim=-1)
-        pre_softmax = -pairwise_dist / self.temperature
+        if normalize_feats:
+            feats = F.normalize(feats, dim=1)
+        # Pairwise dot products
+        prod = torch.mm(feats, feats.t())
+        # Squared norms of all the features
+        sq_norm = prod.diag().unsqueeze(1).expand_as(prod)
+        
+        if dist_type == 'euc':
+            dists = (sq_norm + sq_norm.t() - 2 * prod).sqrt()
+        elif dist_type == 'cos':
+            dists = 1 - (prod / (sq_norm.sqrt() * sq_norm.sqrt().T))
+        else:
+            raise Exception("Type should be 'euc' or 'cos'")
+        
+        eps = 1e-4
+        dists = dists.clamp(min = eps)
+        
+        pre_softmax = -dists / self.temperature        
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -59,8 +69,8 @@ class ManifoldMatchingLoss(nn.Module):
         assert len(lang_feats.shape) == 3
 
         # Adjacent matrices (eq. 1)
-        A_f = self.create_adjacent_matrix(image_feats)
-        A_g = self.create_adjacent_matrix(lang_feats)
+        A_f = self.create_adjacent_matrix(image_feats, self.distance_type)
+        A_g = self.create_adjacent_matrix(lang_feats, self.distance_type)
 
         # MM loss
         # - KL(A_g || A_f) is input as kl_div(A_f, A_g) according to https://pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html
@@ -78,6 +88,6 @@ if __name__ == '__main__':
     features_visual = torch.randn(20, 3, 10).cuda().half()
     features_text = torch.randn(20, 2, 10).cuda().half()
 
-    criterion = ManifoldMatchingLoss(norm_order=2)
+    criterion = ManifoldMatchingLoss()
     loss = criterion(features_visual, features_text)
     print(loss)
