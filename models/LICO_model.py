@@ -5,6 +5,7 @@ import clip
 from typing import List
 
 from models.LICO_loss import LICOLoss
+from training_utils import accuracy
 
 
 class LICOModel(pl.LightningModule):
@@ -70,7 +71,26 @@ class LICOModel(pl.LightningModule):
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    # todo: add validation_step and test_step
+    def validation_step(self, batch, batch_idx):
+        images, target = batch
+        img_features, img_logits = self.image_model.features_forward(images)
+        full_prompt = self.target_names[target].view(target.shape[0], self.clip_tokenizer_dim)
+        with torch.no_grad():
+            text_features = self.text_model.encode_text(full_prompt)
+
+        projected_text_features = self.projection_mlp(text_features)
+
+        img_features = img_features.view(img_features.shape[0], 1, img_features.shape[1])
+        projected_text_features = projected_text_features.view(projected_text_features.shape[0], 1,
+                                                               projected_text_features.shape[1])
+        loss = self.criterion(img_logits, target, img_features, projected_text_features)
+        acc1, acc5 = accuracy(img_logits, target, topk=(1, 5))
+        self.log('val_loss', loss)
+        self.log('val_acc1', acc1, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val_acc5', acc5)
+        return {'val_loss': loss, 'val_acc1': acc1, 'val_acc5': acc5}
+
+    # todo: add test_step
 
     def configure_optimizers(self):
         # todo: add the trainable prompts to the optimizer
