@@ -14,11 +14,12 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
+from models.LICO_model import LICOModel, tokenize_targets
 from models.image_model import ImageClassificationModel
-from training_utils import get_logger
+from training_utils import get_logger, DATASETS_TO_CLASSES, TEXT_CLASSES
 
 
 model_names = sorted(name for name in models.__dict__
@@ -26,8 +27,13 @@ model_names = sorted(name for name in models.__dict__
     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+parser.add_argument('--training-method', type=str, default='baseline',
+                    choices=['baseline', 'LICO'])
+parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO loss')
+parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
+parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -42,7 +48,7 @@ parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
 parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N',
                     help='mini-batch size (default: 128)')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
@@ -89,6 +95,11 @@ def main():
 
     args = parser.parse_args()
 
+    args.training_method = 'LICO'
+    args.alpha = 10.0
+    args.beta = 1.0
+    args.train_mm_temp = True
+    args.epochs = 40
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
@@ -119,7 +130,7 @@ def main():
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 
-    train(args, logger)
+    train(args)
 
 
 def create_dataloaders(args):
@@ -127,13 +138,18 @@ def create_dataloaders(args):
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
     if args.dataset == 'cifar100':
-        from download_datasets import download_and_prepare_cifar100
-        download_and_prepare_cifar100(args.data)
+        if not os.path.exists(os.path.join(args.data, 'train')):
+            from download_datasets import download_and_prepare_cifar100
+            download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        print('batch size set to 64')
+        args.batch_size = 64
 
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
+        print('batch size set to 128')
+        args.batch_size = 128
     else:
         raise NotImplementedError
 
@@ -172,45 +188,64 @@ def create_dataloaders(args):
     return train_loader, val_loader
 
 
-def train(args, logger):
-    dataset_to_classes = {
-        'cifar100': 100,
-        'imagenet': 1000,
-        'cub': 200,
-        'aircraft': 100,
-        'flowers': 102,
-        'cars': 196,
-        'in9l': 9
-    }
-    num_classes = dataset_to_classes[args.dataset]
+def make_model(args, total_steps):
+    num_classes = DATASETS_TO_CLASSES[args.dataset]
 
-    if args.resume:
-        print("\nLoading checkpoint '{}'\n".format(args.resume))
-        model = ImageClassificationModel.load_from_checkpoint(args.resume)
-    else:
-        model = ImageClassificationModel(
-            pretrained=args.pretrained, arch=args.arch, logger=logger, lr=args.lr,
-            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
+    if args.training_method == 'baseline':
+        if args.resume:
+            print("\nLoading checkpoint '{}'\n".format(args.resume))
+            model = ImageClassificationModel.load_from_checkpoint(args.resume)
+        else:
+            model = ImageClassificationModel(
+                pretrained=args.pretrained, arch=args.arch, lr=args.lr,
+                momentum=args.momentum, weight_decay=args.weight_decay,
+                num_classes=num_classes, total_steps=total_steps
+            )
+    elif args.training_method == 'LICO':
+        image_model = ImageClassificationModel(
+            pretrained=args.pretrained, arch=args.arch, lr=args.lr,
+            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes,
+            total_steps=total_steps
         )
-    logger.info(model)
+        target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
+        model = LICOModel(image_model, target_names=target_names,
+                          alpha=args.alpha, beta=args.beta, train_mm_temp=args.train_mm_temp)
+    else:
+        raise NotImplementedError
+    return model
 
+
+def train(args):
+    print(f"Starting training with the following configuration:\n"
+          f" - Dataset: {args.dataset} (Path: {args.data})\n"
+          f" - Architecture: {args.arch}\n"
+          f" - Training Method: {args.training_method}\n"
+          + (f" - Alpha: {args.alpha}\n - Beta: {args.beta}\n" if (args.training_method == 'LICO') else "")
+          + (f" - Resuming from checkpoint: {args.resume}" if args.resume else ""))
     cudnn.benchmark = True
 
     train_loader, val_loader = create_dataloaders(args)
+
+    total_steps = len(train_loader) * args.epochs
+
+    model = make_model(args, total_steps)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.save_dir,
         save_top_k=1,
         monitor='val_loss',
         mode='min',
-        filename=f'{args.dataset}-{args.arch}-' + '{epoch}-{val_loss:.2f}-{val_acc1:.2f}',
+        filename=f'{args.training_method}-{args.dataset}-{args.arch}-' + '{epoch}-{train_loss:.2f}-{val_loss:.2f}-{val_acc1:.2f}',
     )
+
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     trainer = pl.Trainer(
         max_epochs=args.epochs,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, lr_monitor],
         enable_progress_bar=True,
-        logger=TensorBoardLogger(save_dir='./'),
+        logger=WandbLogger(project="lico-reproduction", config=args, log_model=True),
+        gradient_clip_val=0.5,
     )
 
     trainer.fit(model, train_loader, val_loader)

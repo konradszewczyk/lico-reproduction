@@ -1,0 +1,8 @@
+__pycache__/
+data/
+*.pyc
+*.tar.gz
+logs/
+lightning_logs/
+checkpoints/
+checkpoint/
