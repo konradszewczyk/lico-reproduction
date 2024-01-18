@@ -96,10 +96,10 @@ def main():
     args = parser.parse_args()
 
     args.training_method = 'LICO'
-    args.alpha = 0.0
+    args.alpha = 10.0
     args.beta = 1.0
-    args.train_mm_temp = False
-    # args.epochs = 10
+    args.train_mm_temp = True
+    args.epochs = 40
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8

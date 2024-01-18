@@ -5,6 +5,7 @@ import clip
 from typing import List
 
 from models.LICO_loss import LICOLoss
+from models.cosine_lr_scheduler import CosineLRScheduler
 from training_utils import accuracy
 
 
@@ -109,8 +110,8 @@ class LICOModel(pl.LightningModule):
             momentum=self.image_model.momentum,
             weight_decay=self.image_model.weight_decay
         )
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-        return [optimizer], [lr_scheduler]
+        lr_scheduler = CosineLRScheduler(optimizer, T_max=self.image_model.total_steps)
+        return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
 
     def on_save_checkpoint(self, checkpoint):
         # Identify the keys associated with the text_model, which we dont want to save
