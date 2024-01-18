@@ -18,7 +18,6 @@ class LICOModel(pl.LightningModule):
         super().__init__()
 
         self.image_model = image_model
-        # todo: remove that from saving and from parameters in general
         self.text_model, _ = clip.load("ViT-B/32")
         self.register_buffer('target_names', target_names)
 
@@ -112,6 +111,17 @@ class LICOModel(pl.LightningModule):
         )
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
         return [optimizer], [lr_scheduler]
+
+    def on_save_checkpoint(self, checkpoint):
+        # Identify the keys associated with the text_model, which we dont want to save
+        clip_keys = [key for key in checkpoint['state_dict'].keys() if key.startswith('text_model')]
+
+        # Remove these keys from the checkpoint
+        for key in clip_keys:
+            del checkpoint['state_dict'][key]
+
+    def on_load_checkpoint(self, checkpoint):
+        self.text_model, _ = clip.load("ViT-B/32")
 
 
 def tokenize_targets(targets: List[str]) -> torch.tensor:
