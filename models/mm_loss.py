@@ -15,9 +15,9 @@ class ManifoldMatchingLoss(nn.Module):
         self.implementation = implementation
         # Trainable temperature
         if train_temperature:
-            self.temperature = nn.Parameter(torch.tensor(2.5, dtype=torch.float16))
+            self.temperature = nn.Parameter(torch.log(torch.tensor(0.5, dtype=torch.float16)))
         else:
-            self.temperature = torch.tensor(2.5, dtype=torch.float16)
+            self.temperature = torch.log(torch.tensor(0.5, dtype=torch.float16))
     
     def create_adjacent_matrix_ours(self, feats, dist_type, normalize_feats=False):
         """Create adjacent matrix from a matrix of features
@@ -43,7 +43,7 @@ class ManifoldMatchingLoss(nn.Module):
         else:
             raise Exception("Type should be 'euc' or 'cos'")
         
-        pre_softmax = -pairwise_dists / self.temperature
+        pre_softmax = -pairwise_dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -77,7 +77,7 @@ class ManifoldMatchingLoss(nn.Module):
         
         # dists = dists.clamp(min = eps)
         
-        pre_softmax = -dists / self.temperature
+        pre_softmax = -dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -114,7 +114,7 @@ class ManifoldMatchingLoss(nn.Module):
         # - KL(A_g || A_f) is input as kl_div(A_f, A_g) according to https://pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html
         # - "this loss expects the argument input in the log-space"
         mm_loss = F.kl_div(A_f, A_g, log_target=True, reduction=self.reduction)
-        mm_loss = mm_loss.sum(dim=1)
+        mm_loss = mm_loss.sum(dim=0)
         return mm_loss
 
 
