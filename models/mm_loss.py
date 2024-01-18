@@ -19,7 +19,7 @@ class ManifoldMatchingLoss(nn.Module):
         else:
             self.temperature = torch.tensor(2.5, dtype=torch.float16)
     
-    def create_adjacent_matrix_ours(self, feats):
+    def create_adjacent_matrix_ours(self, feats, dist_type, normalize_feats=False):
         """Create adjacent matrix from a matrix of features
 
         Args:
@@ -31,11 +31,19 @@ class ManifoldMatchingLoss(nn.Module):
         batch_size = feats.shape[0]
         # Flatten
         feats = feats.view(batch_size, -1)
+        # Normalize (always happens for cosine distance, optional for euclidean)
+        if normalize_feats or dist_type == 'cos':
+            feats = F.normalize(feats, dim=1)
         # Pairwise distances
-        pairwise_diff = feats.unsqueeze(0) - feats.unsqueeze(1)
-        pairwise_eucl = torch.linalg.vector_norm(pairwise_diff, ord=2, dim=-1)
-        pre_softmax = -pairwise_eucl / self.temperature
+        if dist_type == 'euc':
+            pairwise_diff = feats.unsqueeze(0) - feats.unsqueeze(1)
+            pairwise_dists = torch.linalg.vector_norm(pairwise_diff, ord=2, dim=-1)
+        elif dist_type == 'cos':
+            pairwise_dists = feats @ feats.T
+        else:
+            raise Exception("Type should be 'euc' or 'cos'")
         
+        pre_softmax = -pairwise_dists / self.temperature
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -98,8 +106,8 @@ class ManifoldMatchingLoss(nn.Module):
             A_f = self.create_adjacent_matrix_lico(image_feats, self.distance_type)
             A_g = self.create_adjacent_matrix_lico(lang_feats, self.distance_type)
         elif self.implementation == 'ours':
-            A_f = self.create_adjacent_matrix_ours(image_feats)
-            A_g = self.create_adjacent_matrix_ours(lang_feats)
+            A_f = self.create_adjacent_matrix_ours(image_feats, self.distance_type)
+            A_g = self.create_adjacent_matrix_ours(lang_feats, self.distance_type)
         else:
             raise Exception("Implementation should be either 'lico' or 'ours'")
         # MM loss
@@ -116,13 +124,13 @@ if __name__ == '__main__':
     # t = torch.randn(10, 5).cuda()
     
     for i in range(1000):
-        features_visual = torch.randn(256, 6, 768).cuda().half()
-        features_text = torch.randn(256, 12, 768).cuda().half()
+        features_visual = torch.randn(256, 6, 10).cuda().half()
+        features_text = torch.randn(256, 12, 10).cuda().half()
 
         features_visual.requires_grad = True
 
-        loss_lico = ManifoldMatchingLoss(implementation='lico')(features_visual, features_text)
-        loss_ours = ManifoldMatchingLoss(implementation='ours')(features_visual, features_text)
+        loss_lico = ManifoldMatchingLoss(implementation='lico', distance_type='cos')(features_visual, features_text)
+        loss_ours = ManifoldMatchingLoss(implementation='ours', distance_type='cos')(features_visual, features_text)
 
         # print(f"{loss_lico}\n{loss_ours}\n{loss_lico - loss_ours}")
         # print(f'max_difference: {(loss_lico - loss_ours).abs().max()}')
