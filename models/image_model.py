@@ -6,6 +6,7 @@ from torch import Tensor
 from torchmetrics.classification import MulticlassAccuracy
 
 from training_utils import accuracy
+from models.cosine_lr_scheduler import CosineLRScheduler
 
 
 def features_forward(model, x):
@@ -27,7 +28,7 @@ def features_forward(model, x):
 
 
 class ImageClassificationModel(pl.LightningModule):
-    def __init__(self, pretrained, arch, lr, momentum, weight_decay, num_classes):
+    def __init__(self, pretrained, arch, lr, momentum, weight_decay, num_classes, total_steps):
         super().__init__()
 
         print(f"=> {'using pre-trained' if pretrained else 'creating'} model {arch}")
@@ -47,6 +48,7 @@ class ImageClassificationModel(pl.LightningModule):
         self.lr = lr
         self.momentum = momentum
         self.weight_decay = weight_decay
+        self.total_steps = total_steps
 
         # idk why but these just give straight up wrong values
         # https://lightning.ai/docs/torchmetrics/stable/classification/accuracy.html#multiclassaccuracy
@@ -55,7 +57,7 @@ class ImageClassificationModel(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        return self._actual_fc(self._model(x))
+        return self._model(x)
 
     def features_forward(self, x) -> (torch.Tensor, torch.Tensor):
         """
@@ -68,7 +70,7 @@ class ImageClassificationModel(pl.LightningModule):
         images, target = batch
         output = self(images)
         loss = self.criterion(output, target)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -86,8 +88,8 @@ class ImageClassificationModel(pl.LightningModule):
         optimizer = torch.optim.SGD(self._model.parameters(), self.lr,
                                     momentum=self.momentum,
                                     weight_decay=self.weight_decay)
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-        return [optimizer], [lr_scheduler]
+        lr_scheduler = CosineLRScheduler(optimizer, T_max=self.total_steps)
+        return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
 
     def get_feature_dim(self):
         return self.feature_dim

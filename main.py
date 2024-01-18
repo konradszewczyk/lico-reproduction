@@ -14,7 +14,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 from models.LICO_model import LICOModel, tokenize_targets
@@ -142,10 +142,14 @@ def create_dataloaders(args):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        print('batch size set to 64')
+        args.batch_size = 64
 
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
+        print('batch size set to 128')
+        args.batch_size = 128
     else:
         raise NotImplementedError
 
@@ -184,7 +188,7 @@ def create_dataloaders(args):
     return train_loader, val_loader
 
 
-def make_model(args):
+def make_model(args, total_steps):
     num_classes = DATASETS_TO_CLASSES[args.dataset]
 
     if args.training_method == 'baseline':
@@ -194,12 +198,14 @@ def make_model(args):
         else:
             model = ImageClassificationModel(
                 pretrained=args.pretrained, arch=args.arch, lr=args.lr,
-                momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
+                momentum=args.momentum, weight_decay=args.weight_decay,
+                num_classes=num_classes, total_steps=total_steps
             )
     elif args.training_method == 'LICO':
         image_model = ImageClassificationModel(
             pretrained=args.pretrained, arch=args.arch, lr=args.lr,
-            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
+            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes,
+            total_steps=total_steps
         )
         target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
         model = LICOModel(image_model, target_names=target_names,
@@ -214,13 +220,15 @@ def train(args):
           f" - Dataset: {args.dataset} (Path: {args.data})\n"
           f" - Architecture: {args.arch}\n"
           f" - Training Method: {args.training_method}\n"
-          + f" - Alpha: {args.alpha}\n - Beta: {args.beta}\n" if (args.training_method == 'LICO') else ""
-          + f" - Resuming from checkpoint: {args.resume}" if args.resume else "")
+          + (f" - Alpha: {args.alpha}\n - Beta: {args.beta}\n" if (args.training_method == 'LICO') else "")
+          + (f" - Resuming from checkpoint: {args.resume}" if args.resume else ""))
     cudnn.benchmark = True
 
-    model = make_model(args)
-
     train_loader, val_loader = create_dataloaders(args)
+
+    total_steps = len(train_loader) * args.epochs
+
+    model = make_model(args, total_steps)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.save_dir,
@@ -230,11 +238,13 @@ def train(args):
         filename=f'{args.training_method}-{args.dataset}-{args.arch}-' + '{epoch}-{train_loss:.2f}-{val_loss:.2f}-{val_acc1:.2f}',
     )
 
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+
     trainer = pl.Trainer(
         max_epochs=args.epochs,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, lr_monitor],
         enable_progress_bar=True,
-        logger=WandbLogger(project="lico-reproduction", config=args),
+        logger=WandbLogger(project="lico-reproduction", config=args, log_model=True),
         gradient_clip_val=0.5,
     )
 
