@@ -33,6 +33,7 @@ parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO los
 parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
+parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -47,7 +48,7 @@ parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
 parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N',
                     help='mini-batch size (default: 128)')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
@@ -95,8 +96,10 @@ def main():
     args = parser.parse_args()
 
     args.training_method = 'LICO'
-    args.beta = 0.0
-    args.epochs = 10
+    args.alpha = 0.0
+    args.beta = 1.0
+    args.train_mm_temp = False
+    # args.epochs = 10
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
@@ -199,7 +202,8 @@ def make_model(args):
             momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes
         )
         target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
-        model = LICOModel(image_model, target_names=target_names, alpha=args.alpha, beta=args.beta)
+        model = LICOModel(image_model, target_names=target_names,
+                          alpha=args.alpha, beta=args.beta, train_mm_temp=args.train_mm_temp)
     else:
         raise NotImplementedError
     return model
@@ -211,7 +215,7 @@ def train(args):
           f" - Architecture: {args.arch}\n"
           f" - Training Method: {args.training_method}\n"
           + f" - Alpha: {args.alpha}\n - Beta: {args.beta}\n" if (args.training_method == 'LICO') else ""
-          + (f" - Resuming from checkpoint: {args.resume}" if args.resume else ""))
+          + f" - Resuming from checkpoint: {args.resume}" if args.resume else "")
     cudnn.benchmark = True
 
     model = make_model(args)
@@ -230,7 +234,8 @@ def train(args):
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback],
         enable_progress_bar=True,
-        logger=WandbLogger(project="lico-reproduction", log_model="all"),
+        logger=WandbLogger(project="lico-reproduction", config=args),
+        gradient_clip_val=0.5,
     )
 
     trainer.fit(model, train_loader, val_loader)

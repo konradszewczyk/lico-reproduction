@@ -2,36 +2,46 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from torch import Tensor
 from torchmetrics.classification import MulticlassAccuracy
 
 from training_utils import accuracy
+
+
+def features_forward(model, x):
+    x = model.conv1(x)
+    x = model.bn1(x)
+    x = model.relu(x)
+    x = model.maxpool(x)
+
+    x = model.layer1(x)
+    x = model.layer2(x)
+    x = model.layer3(x)
+    features = model.layer4(x)
+
+    x = model.avgpool(features)
+    x = torch.flatten(x, 1)
+    x = model.fc(x)
+
+    return x, features
 
 
 class ImageClassificationModel(pl.LightningModule):
     def __init__(self, pretrained, arch, lr, momentum, weight_decay, num_classes):
         super().__init__()
 
-        class Identity(nn.Module):
-            def __init__(self):
-                super(Identity, self).__init__()
-
-            def forward(self, x):
-                return x
-
         print(f"=> {'using pre-trained' if pretrained else 'creating'} model {arch}")
         self._model = models.__dict__[arch](pretrained=pretrained)
 
-        # Modify the final layer based on the architecture
-        # we will use the penultimate layer's outputs for feature extraction
-        self._model.fc = Identity()
-
+        assert 'resnet' in arch, 'Only resnet architectures are supported'
         # and this one will be for classification
         if arch == 'resnet18':
-            self.feature_dim = 512
+            self.num_channels = 512
         elif arch == 'resnet50':
-            self.feature_dim = 2048
+            self.num_channels = 2048
+        self.feature_dim = 49
 
-        self._actual_fc = nn.Linear(self.feature_dim, num_classes)
+        self._model_fc = nn.Linear(self.num_channels, num_classes)
 
         self.criterion = nn.CrossEntropyLoss()
         self.lr = lr
@@ -51,11 +61,8 @@ class ImageClassificationModel(pl.LightningModule):
         """
         Returns the features of the penultimate layer and the logits
         """
-        features = self._model(x)
-        # not detaching features because we need to compute the CE loss on them through logits
-        # the MM and OT loss will also affect features, bypassing the logits
-        logits = self._actual_fc(features)
-        return features, logits
+        logits, features = features_forward(self._model, x)
+        return logits, features.view(logits.shape[0], self.num_channels, self.feature_dim)
 
     def training_step(self, batch, batch_idx):
         images, target = batch

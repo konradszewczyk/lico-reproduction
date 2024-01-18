@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class ManifoldMatchingLoss(nn.Module):
-    def __init__(self, distance_type='euc', reduction='none', implementation='ours'):
+    def __init__(self, distance_type='euc', reduction='none', implementation='ours', train_temperature=True):
         """Manifold matching loss from LICO
         """
         super(ManifoldMatchingLoss, self).__init__()
@@ -14,7 +14,10 @@ class ManifoldMatchingLoss(nn.Module):
         self.distance_type = distance_type
         self.implementation = implementation
         # Trainable temperature
-        self.temperature = nn.Parameter(torch.tensor(1.0, dtype=torch.float16))
+        if train_temperature:
+            self.temperature = nn.Parameter(torch.tensor(2.5, dtype=torch.float16))
+        else:
+            self.temperature = torch.tensor(2.5, dtype=torch.float16)
     
     def create_adjacent_matrix_ours(self, feats):
         """Create adjacent matrix from a matrix of features

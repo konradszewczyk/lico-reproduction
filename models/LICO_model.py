@@ -9,7 +9,7 @@ from training_utils import accuracy
 
 
 class LICOModel(pl.LightningModule):
-    def __init__(self, image_model, target_names: torch.tensor, alpha, beta):
+    def __init__(self, image_model, target_names: torch.tensor, alpha, beta, train_mm_temp):
         """
         :param image_model: the image model to use for feature extraction nad classification
             has to implement features_forward() method that gives features and logits
@@ -32,7 +32,7 @@ class LICOModel(pl.LightningModule):
             nn.Linear(768, self.image_model.get_feature_dim(), dtype=torch.float16)
         )  # h
 
-        self.criterion = LICOLoss(alpha, beta, reduction='mean')
+        self.criterion = LICOLoss(alpha, beta, reduction='mean', train_mm_temperature=train_mm_temp)
         
         # self.criterion = LICOLoss(reduction='mean')
         # hyperparameter
@@ -52,7 +52,7 @@ class LICOModel(pl.LightningModule):
         :param batch: tuple of (images, target)
         """
         images, target = batch
-        img_features, img_logits = self.image_model.features_forward(images)
+        img_logits, img_features = self.image_model.features_forward(images)
         # full_prompt = torch.cat([
         #     torch.broadcast_to(self.get_learnable_prompts(), (target.shape[0], self.M, self.tokenizer_dim)),
         #     self.target_names[target]
@@ -64,9 +64,7 @@ class LICOModel(pl.LightningModule):
         # Apply projection MLP (independently on each token embedding)
         projected_text_features = self.projection_mlp(text_features)
 
-        # todo: i have no idea what the num_channels and prompt_size are for the loss
-        # so for now its 1
-        img_features = img_features.view(img_features.shape[0], 1, img_features.shape[1])
+        # 1 here is number of tokens in the prompt
         projected_text_features = projected_text_features.view(projected_text_features.shape[0], 1, projected_text_features.shape[1])
         # if torch.isnan(img_features).any():
             # raise ValueError("Image features contain NaN values.")
@@ -84,14 +82,13 @@ class LICOModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         images, target = batch
-        img_features, img_logits = self.image_model.features_forward(images)
+        img_logits, img_features = self.image_model.features_forward(images)
         full_prompt = self.target_names[target].view(target.shape[0], self.clip_tokenizer_dim)
         with torch.no_grad():
             text_features = self.text_model.encode_text(full_prompt)
 
         projected_text_features = self.projection_mlp(text_features)
 
-        img_features = img_features.view(img_features.shape[0], 1, img_features.shape[1])
         projected_text_features = projected_text_features.view(projected_text_features.shape[0], 1,
                                                                projected_text_features.shape[1])
         loss, mm_part, ot_part = self.criterion(img_logits, target, img_features, projected_text_features)

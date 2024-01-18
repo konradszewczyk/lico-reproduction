@@ -15,7 +15,7 @@ class LICOLoss(nn.Module):
             'mean': the sum of the output will be divided by the number of
             elements in the output, 'sum': the output will be summed. Default: 'none'
     """
-    def __init__(self, alpha=10., beta=1., reduction='none'):
+    def __init__(self, alpha=10., beta=1., reduction='none', train_mm_temperature=True):
         super(LICOLoss, self).__init__()
 
         self.alpha = alpha
@@ -23,7 +23,9 @@ class LICOLoss(nn.Module):
         self.reduction = reduction
 
         self.ce_loss = nn.CrossEntropyLoss(reduction='none')
-        self.mm_loss = ManifoldMatchingLoss(reduction='none', implementation='ours')
+        self.mm_loss = ManifoldMatchingLoss(reduction='none',
+                                            implementation='ours',
+                                            train_temperature=train_mm_temperature)
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
 
     def forward(self, predictions, targets, features_visual, features_text):
