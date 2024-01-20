@@ -42,7 +42,8 @@ class ManifoldMatchingLoss(nn.Module):
             pairwise_dists = feats @ feats.T
         else:
             raise Exception("Type should be 'euc' or 'cos'")
-        
+
+        #pairwise_dists = F.normalize(pairwise_dists, dim=0)
         pre_softmax = -pairwise_dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
         

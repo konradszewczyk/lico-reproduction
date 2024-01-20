@@ -31,6 +31,9 @@ parser.add_argument('--training-method', type=str, default='baseline',
                     choices=['baseline', 'LICO'])
 parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO loss')
 parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
+parser.add_argument('--context_tokens', type=int, default=12, help='number of learnable text tokens')
+parser.add_argument('--learnable_context', type=bool, default=True, help='whether to train params of context tokens')
+parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
 parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
@@ -98,8 +101,11 @@ def main():
     args.training_method = 'LICO'
     args.alpha = 10.0
     args.beta = 1.0
+    args.context_tokens = 12
+    args.learnable_context = True
+    args.dynamic_context = True
     args.train_mm_temp = True
-    args.epochs = 40
+    args.epochs = 200
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
@@ -209,7 +215,9 @@ def make_model(args, total_steps):
         )
         target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
         model = LICOModel(image_model, target_names=target_names,
-                          alpha=args.alpha, beta=args.beta, train_mm_temp=args.train_mm_temp)
+                          alpha=args.alpha, beta=args.beta, context_tokens=args.context_tokens,
+                          learnable_context=args.learnable_context, dynamic_context=args.dynamic_context,
+                          train_mm_temp=args.train_mm_temp)
     else:
         raise NotImplementedError
     return model
