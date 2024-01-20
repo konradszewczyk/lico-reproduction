@@ -115,7 +115,7 @@ class ManifoldMatchingLoss(nn.Module):
         # - KL(A_g || A_f) is input as kl_div(A_f, A_g) according to https://pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html
         # - "this loss expects the argument input in the log-space"
         mm_loss = F.kl_div(A_f, A_g, log_target=True, reduction=self.reduction)
-        mm_loss = mm_loss.sum(dim=0)
+        mm_loss = mm_loss.sum(dim=1)
         return mm_loss
 
 
