@@ -145,10 +145,10 @@ class LICOModel(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        # todo: add the trainable prompts to the optimizer
+        # todo: make this a little nicer - don't really like how it looks now
         optimizer = torch.optim.SGD(
             list(self.image_model.parameters()) + list(self.projection_mlp.parameters()) + list(
-                self.criterion.parameters()),
+                self.criterion.parameters()) + [self.learnable_prompts] if self.learnable_prompts.requires_grad else [],
             self.image_model.lr,
             momentum=self.image_model.momentum,
             weight_decay=self.image_model.weight_decay
