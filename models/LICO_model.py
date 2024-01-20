@@ -26,7 +26,6 @@ class LICOModel(pl.LightningModule):
         self.clip_tokenizer_dim = 77
         self.clip_text_dim = 512
 
-        # todo: im not sure if this one acts independently on each token or not
         self.projection_mlp = nn.Sequential(
             nn.Linear(self.clip_text_dim, 768, dtype=torch.float16),
             nn.ReLU(),
@@ -35,13 +34,9 @@ class LICOModel(pl.LightningModule):
 
         self.criterion = LICOLoss(alpha, beta, reduction='mean', train_mm_temperature=train_mm_temp)
 
-        # self.criterion = LICOLoss(reduction='mean')
         # hyperparameter
         self.M = 10
 
-        # how can the prompts be learnable? they are discrete, they are text prompts!
-        # learnable_prompt = torch.zeros((self.M, self.tokenizer_dim), dtype=torch.long)
-        # self.register_parameter('learnable_prompt', nn.Parameter(learnable_prompt))
         self.dynamic_context = dynamic_context
         self.context_tokens = context_tokens
         self.output_tokens = torch.count_nonzero(target_names, dim=(1, 2)).max() + self.context_tokens
@@ -80,34 +75,19 @@ class LICOModel(pl.LightningModule):
 
         return text_features[:, :self.output_tokens, :]
 
-
     def training_step(self, batch, batch_idx):
         """
         :param batch: tuple of (images, target)
         """
         images, target = batch
         img_logits, img_features = self.image_model.features_forward(images)
-        # full_prompt = torch.cat([
-        #     torch.broadcast_to(self.get_learnable_prompts(), (target.shape[0], self.M, self.tokenizer_dim)),
-        #     self.target_names[target]
-        # ], dim=1)
 
         text_features = self.encode_text_tokens(target)
-
 
         # Apply projection MLP (independently on each token embedding)
         projected_text_features = self.projection_mlp(text_features)
 
-        # 1 here is number of tokens in the prompt
-        # projected_text_features = projected_text_features.view(projected_text_features.shape[0], self.output_tokens,
-        #                                                        projected_text_features.shape[2])
-        # if torch.isnan(img_features).any():
-        # raise ValueError("Image features contain NaN values.")
-        # if torch.isnan(projected_text_features).any():
-        # raise ValueError("Text features contain NaN values.")
         loss, mm_part, ot_part = self.criterion(img_logits, target, img_features, projected_text_features)
-        # if torch.isnan(projected_text_features).any():
-        # raise ValueError("Loss output contains NaN values.")
 
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log('train_mm_part', mm_part)
@@ -117,14 +97,11 @@ class LICOModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         images, target = batch
-        with torch.no_grad():
-            img_logits, img_features = self.image_model.features_forward(images)
-            text_features = self.encode_text_tokens(target)
+        img_logits, img_features = self.image_model.features_forward(images)
+        text_features = self.encode_text_tokens(target)
 
-            projected_text_features = self.projection_mlp(text_features)
+        projected_text_features = self.projection_mlp(text_features)
 
-        # projected_text_features = projected_text_features.view(projected_text_features.shape[0], self.output_tokens,
-        #                                                        projected_text_features.shape[2])
         loss, mm_part, ot_part = self.criterion(img_logits, target, img_features, projected_text_features)
         acc1, acc5 = accuracy(img_logits, target, topk=(1, 5))
         self.log('val_loss', loss)
