@@ -19,6 +19,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from datasets.imagefolder_cgc_ssl import ImageFolder
+from models.cosine_lr_scheduler import CosineLRScheduler
 import models.resnet_multigpu_cgc as resnet
 import wandb
 
@@ -330,23 +331,27 @@ def main_worker(gpu, ngpus_per_node, args, logger):
         batch_size=val_batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
-    if args.evaluate:
-        validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
-        return
-    
     config_dict = vars(args)
     config_dict.update({
         "training_method": "CGC",
     })
     wandb.init(project="lico-reproduction", name="cgc", config=config_dict)
+    
+    if args.evaluate:
+        validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
+        return
+
+    total_steps = len(train_loader) * args.epochs
+    lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        adjust_learning_rate(optimizer, epoch, args)
+        # We are not adjusting every epoch, but every step
+        # adjust_learning_rate(optimizer, epoch, args)
         
         # train for one epoch
-        loss_epoch = train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger)
+        loss_epoch = train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler)
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
@@ -371,7 +376,7 @@ def main_worker(gpu, ngpus_per_node, args, logger):
             }, is_best, args.save_dir)
 
 
-def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger):
+def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -425,12 +430,16 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
         loss.backward()
         optimizer.step()
         
+        # CGC updates schedule per epoch, but LICO updates every step
+        lr_scheduler.step()
+        
         global global_step
         global_step += 1
         
         wandb.log({
             "train_loss_step": xe_loss.item(),
             "train_cgc_part": contrastive_loss.item(),
+            "trainer/global_step": global_step,
         }, step=global_step)
 
         # measure elapsed time
@@ -547,11 +556,14 @@ class ProgressMeter(object):
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
-def adjust_learning_rate(optimizer, epoch, args):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = args.lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
+# def adjust_learning_rate(optimizer, epoch, args):
+    # """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    # total_steps = len(train_loader) * epochs
+    
+    # lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
+    
+    # lr_scheduler.step()
+    # return lr_scheduler.get_lr()
 
 
 def accuracy(output, target, topk=(1,)):
