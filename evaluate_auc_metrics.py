@@ -1,5 +1,6 @@
 ## Code to evaluate the pre-trained model and our CGC trained model with Insertion AUC score.
-
+import sys
+print(sys.path)
 import numpy as np
 from tqdm import tqdm
 
@@ -11,8 +12,9 @@ import torchvision.models as models
 import torch.nn.functional as F
 from utils import *
 from evaluation import CausalMetric, auc, gkern
-from cam import GradCAM
+from cam.grad_cam import GradCAM
 import argparse
+
 
 parser = argparse.ArgumentParser(description="PyTorch AUC Metric Evaluation")
 parser.add_argument(
@@ -21,7 +23,9 @@ parser.add_argument(
 parser.add_argument(
     "--ckpt-path", dest="ckpt_path", type=str, help="path to checkpoint file"
 )
-
+parser.add_argument(
+    "--val-path", dest="val_path", type=str, help="path to validation dataset"
+)
 
 def main():
     args = parser.parse_args()
@@ -45,7 +49,7 @@ def main():
 
     # we process the imagenet 50k val images in 10 set of 5k each and compute mean
     for i in range(10):
-        auc_score = get_auc_per_data_subset(i, net, cam)
+        auc_score = get_auc_per_data_subset(i, net, cam, args)
         scores["ins"].append(auc_score)
         print("Finished evaluating the insertion metrics...")
 
@@ -53,15 +57,15 @@ def main():
     print("Final:\nInsertion - {:.5f}".format(np.mean(scores["ins"])))
 
 
-def get_auc_per_data_subset(range_index, net, cam):
-    batch_size = 100
+def get_auc_per_data_subset(range_index, net, cam, args):
+    batch_size = 50
     data_loader = torch.utils.data.DataLoader(
-        dataset=datasets.ImageFolder("/nfs3/datasets/imagenet/val/", preprocess),
+        dataset=datasets.ImageFolder(args.val_path, preprocess),
         batch_size=batch_size,
         shuffle=False,
         num_workers=8,
         pin_memory=True,
-        sampler=RangeSampler(range(5000 * range_index, 5000 * (range_index + 1))),
+        sampler=RangeSampler(range(50*range_index, 50*(range_index+1),)) # RangeSampler(range(5000 * range_index, 5000 * (range_index + 1))),
     )
 
     net = net.train()
@@ -106,7 +110,14 @@ def get_auc_per_data_subset(range_index, net, cam):
     blur = lambda x: F.conv2d(x, kern, padding=klen // 2)
 
     insertion = CausalMetric(ddp_model, "ins", 224 * 8, substrate_fn=blur)
+    deletion = CausalMetric(ddp_model, "del", 224 * 8, substrate_fn=blur)
 
+
+    # plot
+    img = torch.unsqueeze(torch.from_numpy(images.astype("float32"))[0], 0)
+    insertion.single_run(img, gcam_exp[0], verbose=2, save_to='/home/raft/uva_fact_2024/uva_fact_2024/data/insert')
+    deletion.single_run(img, gcam_exp[0], verbose=2, save_to='/home/raft/uva_fact_2024/uva_fact_2024/data/delete')
+    exit(0)
     # Evaluate insertion
     h = insertion.evaluate(
         torch.from_numpy(images.astype("float32")), gcam_exp, batch_size

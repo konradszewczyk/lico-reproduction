@@ -77,8 +77,10 @@ class CausalMetric:
 
         scores = np.empty(n_steps + 1)
         # Coordinates of pixels in order of decreasing saliency
+        exp_re = explanation.reshape(-1, HW)
+        print(exp_re[-10:])
         salient_order = np.flip(
-            np.argsort(explanation.reshape(-1, HW), axis=1), axis=-1
+            np.argsort(exp_re, axis=1), axis=-1
         )
         for i in range(n_steps + 1):
             pred = self.model(start.cuda())
