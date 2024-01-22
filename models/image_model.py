@@ -42,7 +42,7 @@ class ImageClassificationModel(pl.LightningModule):
             self.num_channels = 2048
         self.feature_dim = 49
 
-        self._model_fc = nn.Linear(self.num_channels, num_classes)
+        self._model.fc = nn.Linear(self.num_channels, num_classes)
 
         self.criterion = nn.CrossEntropyLoss()
         self.lr = lr
