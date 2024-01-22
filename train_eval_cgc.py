@@ -440,6 +440,7 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
             "train_loss_step": xe_loss.item(),
             "train_cgc_part": contrastive_loss.item(),
             "trainer/global_step": global_step,
+            "lr-SGD": lr_scheduler.get_last_lr(),
         }, step=global_step)
 
         # measure elapsed time
