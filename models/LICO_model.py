@@ -27,9 +27,9 @@ class LICOModel(pl.LightningModule):
         self.clip_text_dim = 512
 
         self.projection_mlp = nn.Sequential(
-            nn.Linear(self.clip_text_dim, 768, dtype=torch.float16),
+            nn.Linear(self.clip_text_dim, 512, dtype=torch.float16),
             nn.ReLU(),
-            nn.Linear(768, self.image_model.get_feature_dim(), dtype=torch.float16)
+            nn.Linear(512, self.image_model.get_feature_dim(), dtype=torch.float16)
         )  # h
 
         self.criterion = LICOLoss(alpha, beta, reduction='mean', train_mm_temperature=train_mm_temp)
