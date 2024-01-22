@@ -20,6 +20,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from datasets.imagefolder_cgc_ssl import ImageFolder
 import models.resnet_multigpu_cgc as resnet
+import wandb
 
 import logging
 
@@ -115,9 +116,10 @@ parser.add_argument('--lambda', default=1000, type=float,
                     metavar='LAM', help='lambda hyperparameter for GCAM loss', dest='lambda_val')
 
 best_acc1 = 0
-
+global_step = 0
 
 def main():
+    
     args = parser.parse_args()
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
@@ -210,6 +212,9 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     elif args.dataset == 'cars':
         kwargs = {'num_classes': 196}
         num_classes = 196
+    elif args.dataset == 'cifar100':
+        kwargs = {'num_classes': 100}
+        num_classes = 100
 
     # create model
     if args.pretrained:
@@ -278,7 +283,31 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    train_dataset = ImageFolder(traindir)   # transforms are handled within the implementation
+    args.dataset = 'cifar100'
+    if args.dataset == 'cifar100':
+        if not os.path.exists(os.path.join(args.data, 'train')):
+            from download_datasets import download_and_prepare_cifar100
+            download_and_prepare_cifar100(args.data)
+        normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        print('batch size set to 64')
+        args.batch_size = 64
+
+    elif args.dataset == 'imagenet':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        print('batch size set to 128')
+        args.batch_size = 128
+    else:
+        raise NotImplementedError
+
+    train_dataset = ImageFolder(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -304,17 +333,28 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     if args.evaluate:
         validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
         return
+    
+    config_dict = vars(args)
+    config_dict.update({
+        "training_method": "CGC",
+    })
+    wandb.init(project="lico-reproduction", name="cgc", config=config_dict)
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
-
+        
         # train for one epoch
-        train(train_loader, model, contrastive_criterion , xent_criterion, optimizer, epoch, args, logger)
+        loss_epoch = train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger)
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
+        
+        wandb.log({
+            "epoch": epoch,
+            "train_loss_epoch": loss_epoch,
+        }, step=global_step)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -351,6 +391,7 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
     train_iter = iter(train_loader)
     end = time.time()
     for i in range(train_len):
+        # xe_images , images, aug_images, transforms_i, transforms_j, transforms_h, transforms_w, hor_flip, targets = train_iter.__next__()
         xe_images , images, aug_images, transforms_i, transforms_j, transforms_h, transforms_w, hor_flip, targets = train_iter.__next__()
 
         # measure data loading time
@@ -383,6 +424,14 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        global global_step
+        global_step += 1
+        
+        wandb.log({
+            "train_loss_step": xe_loss.item(),
+            "train_cgc_part": contrastive_loss.item(),
+        }, step=global_step)
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -390,6 +439,7 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
 
         if i % args.print_freq == 0:
             progress.display(i)
+    return losses.avg
 
 
 def validate(val_loader, model, contrastive_criterion, criterion, args, logger):
@@ -426,6 +476,13 @@ def validate(val_loader, model, contrastive_criterion, criterion, args, logger):
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
+            
+            wandb.log({
+                "val_acc1": acc1[0].item(),
+                "val_acc5": acc5[0].item(),
+                "val_loss": loss.item(),
+                # "val_cgc_part": contrastive_loss.item(),
+            }, step=global_step)
 
             if i % args.print_freq == 0:
                 progress.display(i)
