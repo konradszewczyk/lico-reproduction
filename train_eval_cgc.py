@@ -436,11 +436,13 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
         global global_step
         global_step += 1
         
+        last_lr = lr_scheduler.get_last_lr()[0]
+        
         wandb.log({
             "train_loss_step": xe_loss.item(),
             "train_cgc_part": contrastive_loss.item(),
             "trainer/global_step": global_step,
-            "lr-SGD": lr_scheduler.get_last_lr(),
+            "lr-SGD": last_lr,
         }, step=global_step)
 
         # measure elapsed time
