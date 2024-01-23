@@ -145,7 +145,7 @@ def create_dataloaders(args):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        print('batch size set to 64')
+        print('batch size overwritten to 64')
         args.batch_size = 64
         # cifar100 has only 2 sets of data
         testdir = os.path.join(args.data, 'val')
@@ -153,15 +153,15 @@ def create_dataloaders(args):
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        print('batch size set to 128')
+        print('batch size overwritten to 128')
         args.batch_size = 128
         testdir = os.path.join(args.data, 'test')
 
     elif args.dataset == 'imagenet-s50':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        print('batch size set to 128')
-        args.batch_size = 128
+        # print('batch size set to 128')
+        # args.batch_size = 128
         testdir = os.path.join(args.data, 'val')
 
     else:
@@ -186,8 +186,8 @@ def create_dataloaders(args):
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **common_args)
 
     val_transforms = transforms.Compose([
-            transforms.Resize(256),  # why would this be here?
-            transforms.CenterCrop(224),
+            transforms.Resize(224),
+            #transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])
