@@ -187,7 +187,7 @@ def create_dataloaders(args):
 
     val_transforms = transforms.Compose([
             transforms.Resize(224),
-            #transforms.CenterCrop(224),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])
