@@ -162,7 +162,7 @@ def create_dataloaders(args):
                                          std=[0.229, 0.224, 0.225])
         print('batch size set to 128')
         args.batch_size = 128
-        testdir = os.path.join(args.data, 'val')
+        testdir = os.path.join(args.data, 'validation')
 
     else:
         raise NotImplementedError
