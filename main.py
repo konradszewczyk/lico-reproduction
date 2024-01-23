@@ -156,6 +156,14 @@ def create_dataloaders(args):
         print('batch size set to 128')
         args.batch_size = 128
         testdir = os.path.join(args.data, 'test')
+
+    elif args.dataset == 'imagenet-s50':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        print('batch size set to 128')
+        args.batch_size = 128
+        testdir = os.path.join(args.data, 'val')
+
     else:
         raise NotImplementedError
 

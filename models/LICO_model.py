@@ -117,7 +117,7 @@ class LICOModel(pl.LightningModule):
 
         # clamping of the temperature to log(-100) and log(100)
         self.criterion.mm_loss.temperature.data = torch.clamp(
-            self.criterion.mm_loss.temperature.data, -4.6052, 4.6052
+            self.criterion.mm_loss.temperature.data, 0, 4.6052
         )
 
     def configure_optimizers(self):
