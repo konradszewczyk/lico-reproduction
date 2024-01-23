@@ -30,12 +30,9 @@ class LICOModel(pl.LightningModule):
             nn.Linear(self.clip_text_dim, 512, dtype=torch.float16),
             nn.ReLU(),
             nn.Linear(512, self.image_model.get_feature_dim(), dtype=torch.float16)
-        )  # h
+        )
 
         self.criterion = LICOLoss(alpha, beta, reduction='mean', train_mm_temperature=train_mm_temp)
-
-        # hyperparameter
-        self.M = 10
 
         self.dynamic_context = dynamic_context
         self.context_tokens = context_tokens
@@ -45,7 +42,8 @@ class LICOModel(pl.LightningModule):
             requires_grad=learnable_context
         )
 
-        # self.save_hyperparameters()
+        # despite PL asking to ignore image model, we save it as otherwise checkpoints don't load
+        self.save_hyperparameters()
 
     def get_learnable_prompts(self):
         return self.learnable_prompts
@@ -95,7 +93,7 @@ class LICOModel(pl.LightningModule):
         self.log('mm_loss_temperature', self.criterion.mm_loss.temperature)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, logging_prefix='val'):
         images, target = batch
         img_logits, img_features = self.image_model.features_forward(images)
         text_features = self.encode_text_tokens(target)
@@ -104,14 +102,15 @@ class LICOModel(pl.LightningModule):
 
         loss, mm_part, ot_part = self.criterion(img_logits, target, img_features, projected_text_features)
         acc1, acc5 = accuracy(img_logits, target, topk=(1, 5))
-        self.log('val_loss', loss)
-        self.log('val_mm_part', mm_part)
-        self.log('val_ot_part', ot_part)
-        self.log('val_acc1', acc1, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_acc5', acc5)
-        return {'val_loss': loss, 'val_acc1': acc1, 'val_acc5': acc5}
+        self.log(f'{logging_prefix}_loss', loss)
+        self.log(f'{logging_prefix}_mm_part', mm_part)
+        self.log(f'{logging_prefix}_ot_part', ot_part)
+        self.log(f'{logging_prefix}_acc1', acc1, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(f'{logging_prefix}_acc5', acc5)
+        return {f'{logging_prefix}_loss': loss, f'{logging_prefix}_acc1': acc1, f'{logging_prefix}_acc5': acc5}
 
-    # todo: add test_step
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx, logging_prefix='test')
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)

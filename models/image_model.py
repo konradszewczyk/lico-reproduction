@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from torch import Tensor
-from torchmetrics.classification import MulticlassAccuracy
 
 from training_utils import accuracy
 from models.cosine_lr_scheduler import CosineLRScheduler
@@ -35,7 +34,6 @@ class ImageClassificationModel(pl.LightningModule):
         self._model = models.__dict__[arch](pretrained=pretrained)
 
         assert 'resnet' in arch, 'Only resnet architectures are supported'
-        # and this one will be for classification
         if arch == 'resnet18':
             self.num_channels = 512
         elif arch == 'resnet50':
@@ -50,10 +48,6 @@ class ImageClassificationModel(pl.LightningModule):
         self.weight_decay = weight_decay
         self.total_steps = total_steps
 
-        # idk why but these just give straight up wrong values
-        # https://lightning.ai/docs/torchmetrics/stable/classification/accuracy.html#multiclassaccuracy
-        # self.metric1 = MulticlassAccuracy(num_classes=num_classes, top_k=1)
-        # self.metric5 = MulticlassAccuracy(num_classes=num_classes, top_k=5)
         self.save_hyperparameters()
 
     def forward(self, x):
@@ -73,16 +67,19 @@ class ImageClassificationModel(pl.LightningModule):
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, logging_prefix='val'):
         images, target = batch
         output = self(images)
         loss = self.criterion(output, target)
         # acc1, acc5 = self.metric1(output, target), self.metric5(output, target)
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        self.log('val_loss', loss)
-        self.log('val_acc1', acc1, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_acc5', acc5)
-        return {'val_loss': loss, 'val_acc1': acc1, 'val_acc5': acc5}
+        self.log(f'{logging_prefix}_loss', loss)
+        self.log(f'{logging_prefix}_acc1', acc1, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(f'{logging_prefix}_acc5', acc5)
+        return {f'{logging_prefix}_loss': loss, f'{logging_prefix}_acc1': acc1, f'{logging_prefix}_acc5': acc5}
+    
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx, logging_prefix='test')
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self._model.parameters(), self.lr,
