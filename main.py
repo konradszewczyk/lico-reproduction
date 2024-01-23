@@ -162,7 +162,7 @@ def create_dataloaders(args):
                                          std=[0.229, 0.224, 0.225])
         print('batch size set to 128')
         args.batch_size = 128
-        testdir = os.path.join(args.data, 'validation')
+        testdir = os.path.join(args.data, 'val')
 
     else:
         raise NotImplementedError
@@ -186,8 +186,8 @@ def create_dataloaders(args):
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **common_args)
 
     val_transforms = transforms.Compose([
-            transforms.Resize(256),  # why would this be here?
-            transforms.CenterCrop(224),
+            transforms.Resize(224),  # why would this be here?
+            #transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])
