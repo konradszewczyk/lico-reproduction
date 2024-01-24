@@ -499,7 +499,7 @@ def validate(val_loader, model, contrastive_criterion, criterion, args, logger):
         wandb.log({
             "val_acc1": top1.avg / 100,
             "val_acc5": top5.avg / 100,
-            "val_loss": losses.avg / 100,
+            "val_loss": losses.avg,
             # "val_cgc_part": contrastive_loss.item(),
         }, step=global_step)
 
