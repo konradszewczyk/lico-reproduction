@@ -31,6 +31,9 @@ parser.add_argument('--training-method', type=str, default='baseline',
                     choices=['baseline', 'LICO'])
 parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO loss')
 parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
+parser.add_argument('--context_tokens', type=int, default=12, help='number of learnable text tokens')
+parser.add_argument('--learnable_context', type=bool, default=True, help='whether to train params of context tokens')
+parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
 parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
@@ -95,16 +98,23 @@ def main():
 
     args = parser.parse_args()
 
-    args.training_method = 'LICO'
-    args.alpha = 10.0
-    args.beta = 1.0
-    args.train_mm_temp = True
-    args.epochs = 40
+    # args.seed = 42
+    # args.training_method = 'LICO'
+    # args.alpha = 10.0
+    # args.beta = 1.0
+    # args.context_tokens = 12
+    # args.learnable_context = True
+    # args.dynamic_context = True
+    # args.train_mm_temp = True
+    # args.epochs = 2
+
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
     # args.arch = 'resnet50'
-    # args.resume = 'checkpoint/epoch=2-val_loss=3.24-val_acc1=0.21.ckpt'
+
+    # args.resume = 'checkpoint/LICO-cifar100-resnet18-seed_42epoch=1-train_loss=4.00-val_loss=3.81-val_acc1=0.15.ckpt'
+    # args.evaluate = True
 
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
@@ -112,25 +122,18 @@ def main():
     logger.info(args)
 
     if args.seed is not None:
-        random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        cudnn.deterministic = True
-        warnings.warn('You have chosen to seed training. '
-                      'This will turn on the CUDNN deterministic setting, '
-                      'which can slow down your training considerably! '
-                      'You may see unexpected behavior when restarting '
-                      'from checkpoints.')
+        pl.seed_everything(args.seed)
 
     if args.gpu is not None:
         warnings.warn('You have chosen a specific GPU. This will completely '
                       'disable data parallelism.')
 
-    if args.dist_url == "env://" and args.world_size == -1:
-        args.world_size = int(os.environ["WORLD_SIZE"])
-
-    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
-
-    train(args)
+    if args.evaluate:
+        assert args.resume, 'Cannot evaluate without a checkpoint'
+        assert os.path.isfile(args.resume), 'Checkpoint not found'
+        evaluate(args)
+    else:
+        train(args)
 
 
 def create_dataloaders(args):
@@ -142,16 +145,34 @@ def create_dataloaders(args):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        print('batch size set to 64')
-        args.batch_size = 64
+        # print('batch size overwritten to 64')
+        # args.batch_size = 64
+        # cifar100 has only 2 sets of data
+        testdir = os.path.join(args.data, 'val')
 
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        print('batch size set to 128')
-        args.batch_size = 128
+        # print('batch size overwritten to 128')
+        # args.batch_size = 128
+        testdir = os.path.join(args.data, 'test')
+
+    elif args.dataset == 'imagenet-s50':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        # print('batch size set to 128')
+        # args.batch_size = 128
+        testdir = os.path.join(args.data, 'val')
+
     else:
         raise NotImplementedError
+
+    common_args = {
+        'batch_size': args.batch_size,
+        'num_workers': args.workers,
+        'pin_memory': True,
+        'persistent_workers': True
+    }
 
     train_dataset = datasets.ImageFolder(
         traindir,
@@ -162,30 +183,21 @@ def create_dataloaders(args):
             normalize,
         ]))
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset,
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True,
-        persistent_workers=True,
-    )
+    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **common_args)
 
-    val_dataset = datasets.ImageFolder(
-        valdir,
-        transforms.Compose([
-            transforms.Resize(256),  # why would this be here?
+    val_transforms = transforms.Compose([
+            transforms.Resize(224),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])
-    )
 
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True,
-        persistent_workers=True,
-    )
-    return train_loader, val_loader
+    val_dataset = datasets.ImageFolder(valdir, val_transforms)
+    val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **common_args)
+
+    test_dataset = datasets.ImageFolder(testdir, val_transforms)
+    test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=False, **common_args)
+    return train_loader, val_loader, test_loader
 
 
 def make_model(args, total_steps):
@@ -202,14 +214,23 @@ def make_model(args, total_steps):
                 num_classes=num_classes, total_steps=total_steps
             )
     elif args.training_method == 'LICO':
-        image_model = ImageClassificationModel(
-            pretrained=args.pretrained, arch=args.arch, lr=args.lr,
-            momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes,
-            total_steps=total_steps
-        )
         target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
-        model = LICOModel(image_model, target_names=target_names,
-                          alpha=args.alpha, beta=args.beta, train_mm_temp=args.train_mm_temp)
+        if args.resume:
+            print("\nLoading checkpoint '{}'\n".format(args.resume))
+            model = LICOModel.load_from_checkpoint(
+                # strict=False because text model is not in the checkpoint
+                args.resume, strict=False,
+            )
+        else:
+            image_model = ImageClassificationModel(
+                pretrained=args.pretrained, arch=args.arch, lr=args.lr,
+                momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes,
+                total_steps=total_steps
+            )
+            model = LICOModel(image_model, target_names=target_names,
+                              alpha=args.alpha, beta=args.beta, context_tokens=args.context_tokens,
+                              learnable_context=args.learnable_context, dynamic_context=args.dynamic_context,
+                              train_mm_temp=args.train_mm_temp)
     else:
         raise NotImplementedError
     return model
@@ -220,11 +241,12 @@ def train(args):
           f" - Dataset: {args.dataset} (Path: {args.data})\n"
           f" - Architecture: {args.arch}\n"
           f" - Training Method: {args.training_method}\n"
+          f" - Seed: {args.seed}\n"
           + (f" - Alpha: {args.alpha}\n - Beta: {args.beta}\n" if (args.training_method == 'LICO') else "")
           + (f" - Resuming from checkpoint: {args.resume}" if args.resume else ""))
     cudnn.benchmark = True
 
-    train_loader, val_loader = create_dataloaders(args)
+    train_loader, val_loader, _ = create_dataloaders(args)
 
     total_steps = len(train_loader) * args.epochs
 
@@ -232,10 +254,9 @@ def train(args):
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.save_dir,
-        save_top_k=1,
-        monitor='val_loss',
-        mode='min',
-        filename=f'{args.training_method}-{args.dataset}-{args.arch}-' + '{epoch}-{train_loss:.2f}-{val_loss:.2f}-{val_acc1:.2f}',
+        filename=f'{args.training_method}-{args.dataset}-{args.arch}-'
+                 f'{("seed_" + str(args.seed) + "-") if args.seed else ""}' +
+                 '{epoch}-{train_loss:.2f}-{val_loss:.2f}-{val_acc1:.2f}',
     )
 
     lr_monitor = LearningRateMonitor(logging_interval='step')
@@ -249,6 +270,20 @@ def train(args):
     )
 
     trainer.fit(model, train_loader, val_loader)
+
+
+def evaluate(args):
+    print("Evaluating the model")
+    _, _, test_loader = create_dataloaders(args)
+
+    model = make_model(args, 1)
+
+    trainer = pl.Trainer(
+        enable_progress_bar=True,
+        logger=WandbLogger(project="lico-reproduction-eval", config=args),
+    )
+
+    trainer.test(model, test_loader)
 
 
 if __name__ == '__main__':

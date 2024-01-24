@@ -15,9 +15,9 @@ class ManifoldMatchingLoss(nn.Module):
         self.implementation = implementation
         # Trainable temperature
         if train_temperature:
-            self.temperature = nn.Parameter(torch.tensor(2.5, dtype=torch.float16))
+            self.temperature = nn.Parameter(torch.log(torch.tensor(2.0, dtype=torch.float16)))
         else:
-            self.temperature = torch.tensor(2.5, dtype=torch.float16)
+            self.temperature = torch.log(torch.tensor(2.0, dtype=torch.float16))
     
     def create_adjacent_matrix_ours(self, feats, dist_type, normalize_feats=False):
         """Create adjacent matrix from a matrix of features
@@ -42,8 +42,9 @@ class ManifoldMatchingLoss(nn.Module):
             pairwise_dists = feats @ feats.T
         else:
             raise Exception("Type should be 'euc' or 'cos'")
-        
-        pre_softmax = -pairwise_dists / self.temperature
+
+        #pairwise_dists = F.normalize(pairwise_dists, dim=0)
+        pre_softmax = -pairwise_dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -77,7 +78,7 @@ class ManifoldMatchingLoss(nn.Module):
         
         # dists = dists.clamp(min = eps)
         
-        pre_softmax = -dists / self.temperature
+        pre_softmax = -dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
         
         return A
@@ -103,11 +104,11 @@ class ManifoldMatchingLoss(nn.Module):
 
         # Adjacent matrices (eq. 1)
         if self.implementation == 'lico':
-            A_f = self.create_adjacent_matrix_lico(image_feats, self.distance_type)
-            A_g = self.create_adjacent_matrix_lico(lang_feats, self.distance_type)
+            A_f = self.create_adjacent_matrix_lico(image_feats, self.distance_type, normalize_feats=True)
+            A_g = self.create_adjacent_matrix_lico(lang_feats, self.distance_type, normalize_feats=True)
         elif self.implementation == 'ours':
-            A_f = self.create_adjacent_matrix_ours(image_feats, self.distance_type)
-            A_g = self.create_adjacent_matrix_ours(lang_feats, self.distance_type)
+            A_f = self.create_adjacent_matrix_ours(image_feats, self.distance_type, normalize_feats=True)
+            A_g = self.create_adjacent_matrix_ours(lang_feats, self.distance_type, normalize_feats=True)
         else:
             raise Exception("Implementation should be either 'lico' or 'ours'")
         # MM loss

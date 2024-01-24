@@ -49,6 +49,7 @@ def accuracy(output, target, topk=(1,)):
 DATASETS_TO_CLASSES = {
     'cifar100': 100,
     'imagenet': 1000,
+    'imagenet-s50': 50,
     'cub': 200,
     'aircraft': 100,
     'flowers': 102,
@@ -57,20 +58,31 @@ DATASETS_TO_CLASSES = {
 }
 
 cifar100_classes = (
-    'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle', 'bottle', 'bowl', 'boy',
+    'apple', 'aquarium fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle', 'bottle', 'bowl', 'boy',
     'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle',
     'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch', 'cra', 'crocodile', 'cup', 'dinosaur', 'dolphin',
     'elephant', 'flatfish', 'forest', 'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard',
-    'lamp', 'lawn_mower', 'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse',
-    'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree',
+    'lamp', 'lawn mower', 'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple tree', 'motorcycle', 'mountain', 'mouse',
+    'mushroom', 'oak tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree',
     'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal',
     'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake', 'spider',
-    'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor',
+    'squirrel', 'streetcar', 'sunflower', 'sweet pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor',
     'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman', 'worm'
+)
+
+imagenet_s50_classes = (
+    "goldfish", "tiger shark", "goldfinch", "tree frog", "kuvasz", "red fox", "siamese cat", "american black bear",
+    "ladybug", "sulphur butterfly", "wood rabbit", "hamster", "wild boar", "gibbon", "african elephant", "giant panda",
+    "airliner", "ashcan", "ballpoint", "beach wagon", "boathouse", "bullet train", "cellular telephone", "chest",
+    "clog", "container ship", "digital watch", "dining table", "golf ball", "grand piano", "iron", "lab coat",
+    "mixing bowl", "motor scooter", "padlock", "park bench", "purse", "streetcar", "table lamp", "television",
+    "toilet seat", "umbrella", "vase", "water bottle", "water tower", "yawl", "street sign", "lemon", "carbonara",
+    "agaric"
 )
 
 TEXT_CLASSES = {
     'cifar100': cifar100_classes,
+    'imagenet-s50': imagenet_s50_classes,
     'imagenet': None,
     'cub': None,
     'aircraft': None,

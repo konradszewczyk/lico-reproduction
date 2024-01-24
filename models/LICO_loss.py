@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 from models.mm_loss import ManifoldMatchingLoss
 from models.sinkhorn_distance import SinkhornDistance
 
@@ -26,7 +27,7 @@ class LICOLoss(nn.Module):
         self.mm_loss = ManifoldMatchingLoss(reduction='none',
                                             implementation='ours',
                                             train_temperature=train_mm_temperature)
-        self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none')
+        self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none', normalise_features=True)
 
     def forward(self, predictions, targets, features_visual, features_text):
         # features_visual is F with shape (batch_size, num_channels, d_prime)
@@ -59,11 +60,14 @@ class LICOLoss(nn.Module):
 
 if __name__ == '__main__':
     y = torch.randn(10, 5).cuda()
-    t = torch.randn(10, 5).cuda()
+    t = torch.randn(10, 5).argmax(dim=-1).cuda()
 
-    features_visual = torch.randn(10, 2, 10).cuda().half()
-    features_text = torch.randn(10, 5, 10).cuda().half()
+    features_visual = torch.randn(10, 512, 49).cuda().half()
+    features_text = torch.randn(10, 5, 49).cuda().half()
 
-    criterion = LICOLoss(alpha=1.0, beta=1.0)
-    loss = criterion(y, t, features_visual, features_text)
-    print(loss)
+    criterion = LICOLoss(alpha=10.0, beta=1.0)
+    total_loss, mm_loss, ot_loss = criterion(y, t, features_visual, features_text)
+
+    print(total_loss)
+    print(mm_loss)
+    print(ot_loss)
