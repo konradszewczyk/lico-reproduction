@@ -1,0 +1,50 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu
+#SBATCH --gpus=1
+#SBATCH --job-name=LICO_training
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=03:00:00
+#SBATCH --mem=16000M
+#SBATCH --output=output/slurm_output_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+
+# activate the environment
+source activate fact2024
+
+export WANDB_API_KEY="#####"
+
+# Run 1: Visual prompting CLIP on CIFAR-10 with standard text prompt
+code_dir="$HOME/uva_fact_2024"
+
+# Standard constants
+arch="resnet18"
+dataset="imagenet-s50"
+data="$code_dir/data/ImageNet-S50"
+epochs=100
+seed=1
+batch_size=128
+
+training_method="baseline"
+alpha=10.0
+beta=1.0
+
+## Copy the data to the scratch-local
+root=/scratch-local/$USER
+mkdir -p $root
+cp -r $data "$root/data"
+
+echo "Running experiment on $dataset with $training_method $method and batch size $batch_size and seed $seed"
+python $code_dir/main.py \
+    --dataset $dataset \
+    --data "$root/data" \
+    --arch $arch \
+    --epochs $epochs \
+    --training_method $training_method \
+    --alpha $alpha \
+    --beta $beta \
+    --seed $seed
