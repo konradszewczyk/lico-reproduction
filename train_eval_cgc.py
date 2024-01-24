@@ -395,6 +395,8 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
     train_len = len(train_loader)
     train_iter = iter(train_loader)
     end = time.time()
+    global global_step
+
     for i in range(train_len):
         # xe_images , images, aug_images, transforms_i, transforms_j, transforms_h, transforms_w, hor_flip, targets = train_iter.__next__()
         xe_images , images, aug_images, transforms_i, transforms_j, transforms_h, transforms_w, hor_flip, targets = train_iter.__next__()
@@ -433,17 +435,7 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
         # CGC updates schedule per epoch, but LICO updates every step
         lr_scheduler.step()
         
-        global global_step
         global_step += 1
-        
-        last_lr = lr_scheduler.get_last_lr()[0]
-        
-        wandb.log({
-            "train_loss_step": xe_loss.item(),
-            "train_cgc_part": contrastive_loss.item(),
-            "trainer/global_step": global_step,
-            "lr-SGD": last_lr,
-        }, step=global_step)
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -451,6 +443,16 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
 
         if i % args.print_freq == 0:
             progress.display(i)
+
+    last_lr = lr_scheduler.get_last_lr()[0]
+
+    wandb.log({
+        "train_loss_step": xe_losses.avg,
+        "train_cgc_part": gc_losses.avg,
+        "trainer/global_step": global_step,
+        "lr-SGD": last_lr,
+    }, step=global_step)
+
     return losses.avg
 
 
@@ -488,19 +490,18 @@ def validate(val_loader, model, contrastive_criterion, criterion, args, logger):
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-            
-            wandb.log({
-                "val_acc1": acc1[0].item(),
-                "val_acc5": acc5[0].item(),
-                "val_loss": loss.item(),
-                # "val_cgc_part": contrastive_loss.item(),
-            }, step=global_step)
 
             if i % args.print_freq == 0:
                 progress.display(i)
 
         logger.info(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
+        wandb.log({
+            "val_acc1": top1.avg / 100,
+            "val_acc5": top5.avg / 100,
+            "val_loss": losses.avg / 100,
+            # "val_cgc_part": contrastive_loss.item(),
+        }, step=global_step)
 
     return top1.avg
 
