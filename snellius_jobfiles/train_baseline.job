@@ -44,7 +44,7 @@ python $code_dir/main.py \
     --data "$root/data" \
     --arch $arch \
     --epochs $epochs \
-    --training_method $training_method \
+    --training-method $training_method \
     --alpha $alpha \
     --beta $beta \
     --seed $seed
