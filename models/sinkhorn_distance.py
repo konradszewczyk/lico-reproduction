@@ -20,13 +20,18 @@ class SinkhornDistance(nn.Module):
         - Output: :math:`(N)` or :math:`()`, depending on `reduction`
     """
 
-    def __init__(self, eps, max_iter, reduction='none'):
+    def __init__(self, eps, max_iter, reduction='none', normalise_features=True):
         super(SinkhornDistance, self).__init__()
         self.eps = eps
         self.max_iter = max_iter
         self.reduction = reduction
+        self.normalise_features = normalise_features
 
     def forward(self, x, y):
+        if self.normalise_features:
+            x = nn.functional.normalize(x, dim=-1)
+            y = nn.functional.normalize(y, dim=-1)
+
         # The Sinkhorn algorithm takes as input three variables :
         C = self._cost_matrix(x, y)  # Wasserstein cost function
         # print(x.size(), y.size(), C.shape)
@@ -68,7 +73,7 @@ class SinkhornDistance(nn.Module):
         # Transport plan pi = diag(a)*K*diag(b)
         pi = torch.exp(self.M(C, U, V))
         # Sinkhorn distance
-        cost = torch.mean(pi * C, dim=(-2, -1))
+        cost = torch.sum(pi * C, dim=(-2, -1))
 
         if self.reduction == 'mean':
             cost = cost.mean()
