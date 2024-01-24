@@ -24,7 +24,7 @@ code_dir="$HOME/uva_fact_2024"
 # Standard constants
 arch="resnet18"
 dataset="imagenet-s50"
-data="$code_dir/data/ImageNet-S50"
+data="$code_dir/data/ImageNetS50"
 epochs=100
 seed=1
 batch_size=128
