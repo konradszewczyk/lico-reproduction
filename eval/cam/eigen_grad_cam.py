@@ -1,5 +1,5 @@
-from base_cam import BaseCAM
-from utils.svd_on_activations import get_2d_projection
+from eval.cam.base_cam import BaseCAM
+from eval.cam.utils.svd_on_activations import get_2d_projection
 
 
 # Like Eigen CAM: https://arxiv.org/abs/2008.00299
