@@ -1,7 +1,7 @@
 from tqdm import tqdm
 from scipy.ndimage.filters import gaussian_filter
 
-from utils import *
+from eval.utils import *
 
 HW = 224 * 224  # image area
 n_classes = 1000
