@@ -33,6 +33,7 @@ parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO los
 parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
 parser.add_argument('--context_tokens', type=int, default=12, help='number of learnable text tokens')
 parser.add_argument('--learnable_context', type=bool, default=True, help='whether to train params of context tokens')
+parser.add_argument('--enable_cls_prompts', default=False, action=argparse.BooleanOptionalAction, help='enable trainable prompts per class')
 parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
@@ -230,7 +231,7 @@ def make_model(args, total_steps):
             model = LICOModel(image_model, target_names=target_names,
                               alpha=args.alpha, beta=args.beta, context_tokens=args.context_tokens,
                               learnable_context=args.learnable_context, dynamic_context=args.dynamic_context,
-                              train_mm_temp=args.train_mm_temp)
+                              train_mm_temp=args.train_mm_temp, enable_cls_prompts=args.enable_cls_prompts, num_classes=num_classes)
     else:
         raise NotImplementedError
     return model
