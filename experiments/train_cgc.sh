@@ -19,12 +19,8 @@ LR=0.03
 MOMENTUM=0.9
 WEIGHT_DECAY=0.0001
 PRINT_FREQ=10
-EVALUATE=true
 DIST_BACKEND="nccl"
 SEED=42
-
-# ???
-# --gpu $GPU \
 
 python train_eval_cgc.py \
               -a $ARCH \
