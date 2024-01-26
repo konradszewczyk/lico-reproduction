@@ -4,8 +4,8 @@
 #SBATCH --gpus=1
 #SBATCH --job-name=LICO_training
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --time=04:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --time=03:00:00
 #SBATCH --mem=16000M
 #SBATCH --output=output/slurm_output_%A.out
 
@@ -28,9 +28,9 @@ data="$code_dir/data/ImageNetS50"
 epochs=100
 seed=1
 batch_size=128
-workers=16
+workers=8
 
-training_method="baseline"
+training_method="lico"
 alpha=10.0
 beta=1.0
 
