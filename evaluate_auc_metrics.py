@@ -76,10 +76,10 @@ def main():
         weight_decay=None,
         total_steps=10000,  # a placeholder value.
     )
-    # Remove image_model prefix from loaded model. It is probably generaeted based on the
-    # moudule folder name.
+    # Remove image_model prefix from loaded model. It is probably generated based on the
+    # module folder name.
     state_dict = {k.replace("image_model.", ""): v for k, v in state_dict.items()}
-    # Remove LICO parameters. Those are supposed be thrown away after the training.
+    # Remove LICO parameters. Those were supposed to be thrown away after the training.
     filer = (
         "learnable_prompts",
         "target_names",
