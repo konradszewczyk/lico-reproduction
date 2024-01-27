@@ -215,7 +215,7 @@ def make_model(args, total_steps):
                 num_classes=num_classes, total_steps=total_steps
             )
     elif args.training_method == 'LICO':
-        target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
+        target_names = tokenize_targets(TEXT_CLASSES[args.dataset], args.context_tokens)
         if args.resume:
             print("\nLoading checkpoint '{}'\n".format(args.resume))
             model = LICOModel.load_from_checkpoint(

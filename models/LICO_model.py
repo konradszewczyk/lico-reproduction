@@ -21,7 +21,7 @@ class LICOModel(pl.LightningModule):
         dynamic_context: bool,
         train_mm_temp: bool,
         num_classes: int = 1,
-        enable_cls_prompts : bool = False,
+        enable_cls_prompts: bool = False,
     ):
         """
         :param image_model: the image model to use for feature extraction nad classification
@@ -81,13 +81,6 @@ class LICOModel(pl.LightningModule):
                 self.text_model.dtype
             )
 
-        prefix_length = 1
-        label_length = (
-            self.text_model.positional_embedding.shape[0] - self.context_tokens
-        )
-        label_prefix = label_features[:, :prefix_length, :]
-        label_suffix = label_features[:, prefix_length:label_length, :]
-
         if self.enable_cls_prompts:
             # `target` is a tensor that holds indices of labels. Each index in `target`
             # corresponds to a specific label, and each label is associated with its own
@@ -99,10 +92,9 @@ class LICOModel(pl.LightningModule):
             context_order = torch.randperm(self.context_tokens)
             context_features = context_features[:, context_order, :]
 
-        text_features = torch.concat(
-            [label_prefix, context_features, label_suffix], dim=1
-        )
-
+        label_features[:, 1 : self.context_tokens + 1, :] = context_features
+        text_features = label_features
+        # clip
         text_features = text_features + self.text_model.positional_embedding.type(
             self.text_model.dtype
         )
@@ -204,12 +196,19 @@ class LICOModel(pl.LightningModule):
         self.text_model, _ = clip.load("ViT-B/32")
 
 
-def tokenize_targets(targets: List[str]) -> torch.tensor:
+def tokenize_targets(targets: List[str], num_context_tokens: int) -> torch.tensor:
     """
     :param targets: list of strings with class names
     :return: tensor of tokenized class names
     """
     tokenized = []
     for i, target in enumerate(targets):
-        tokenized.append(clip.tokenize(target))
+        tokens = clip.tokenize(target)
+        # start token [SOS]
+        sos = tokens[:, :1]
+        # placeholders for learnable prompts
+        place_holders = torch.zeros(1, num_context_tokens)
+        # target tokens + [EOS]
+        target_eos = tokens[:, 1:-num_context_tokens]
+        tokenized.append(torch.cat((sos, place_holders, target_eos), 1).type(dtype=torch.int32))
     return torch.stack(tokenized).to(dtype=torch.long)
