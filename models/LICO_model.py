@@ -73,6 +73,7 @@ class LICOModel(pl.LightningModule):
 
     def encode_text_tokens(self, target):
         batch_size = target.shape[0]
+        target = torch.arange(0, batch_size)
         label_prompt = self.target_names[target].view(
             batch_size, self.clip_tokenizer_dim
         )
@@ -81,12 +82,9 @@ class LICOModel(pl.LightningModule):
                 self.text_model.dtype
             )
 
-        prefix_length = 1
         label_length = (
             self.text_model.positional_embedding.shape[0] - self.context_tokens
         )
-        label_prefix = label_features[:, :prefix_length, :]
-        label_suffix = label_features[:, prefix_length:label_length, :]
 
         if self.enable_cls_prompts:
             # `target` is a tensor that holds indices of labels. Each index in `target`
@@ -99,9 +97,18 @@ class LICOModel(pl.LightningModule):
             context_order = torch.randperm(self.context_tokens)
             context_features = context_features[:, context_order, :]
 
-        text_features = torch.concat(
-            [label_prefix, context_features, label_suffix], dim=1
-        )
+        cls_positions = label_prompt.argmax(dim=-1)
+        text_features = label_features.clone()
+        text_features[torch.arange(batch_size), cls_positions + self.context_tokens, :] = \
+            text_features[torch.arange(batch_size), cls_positions, :]
+        for ctx_idx in range(self.context_tokens):
+            text_features[torch.arange(batch_size), cls_positions + ctx_idx, :] = \
+                context_features[torch.arange(batch_size), ctx_idx, :]
+        #label_suffix = label_features[:, prefix_length:label_length, :]
+
+        # text_features = torch.concat(
+        #     [label_prefix, context_features, label_suffix], dim=1
+        # )
 
         text_features = text_features + self.text_model.positional_embedding.type(
             self.text_model.dtype
@@ -113,7 +120,7 @@ class LICOModel(pl.LightningModule):
             self.text_model.dtype
         )
 
-        return text_features[:, : self.output_tokens, :]
+        return text_features[:, 1: self.output_tokens, :]
 
     def training_step(self, batch, batch_idx):
         """
