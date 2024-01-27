@@ -250,14 +250,6 @@ def train(args):
 
     total_steps = len(train_loader) * args.epochs
 
-    # import matplotlib.pyplot as plt
-    # for batch in train_loader:
-    #     imgs, targets = batch
-    #     print(targets)
-    #     plt.imshow(imgs[1].permute(1, 2, 0))
-    #     plt.show()
-    #     exit()
-
     model = make_model(args, total_steps)
 
     checkpoint_callback = ModelCheckpoint(
