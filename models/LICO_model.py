@@ -82,11 +82,8 @@ class LICOModel(pl.LightningModule):
             )
 
         prefix_length = 1
-        label_length = (
-            self.text_model.positional_embedding.shape[0] - self.context_tokens
-        )
         label_prefix = label_features[:, :prefix_length, :]
-        label_suffix = label_features[:, prefix_length:label_length, :]
+        label_suffix = label_features[:, prefix_length:, :]
 
         if self.enable_cls_prompts:
             # `target` is a tensor that holds indices of labels. Each index in `target`
@@ -102,7 +99,7 @@ class LICOModel(pl.LightningModule):
         text_features = torch.concat(
             [label_prefix, context_features, label_suffix], dim=1
         )
-
+        text_features = text_features[:, :self.clip_tokenizer_dim, : ]
         text_features = text_features + self.text_model.positional_embedding.type(
             self.text_model.dtype
         )
