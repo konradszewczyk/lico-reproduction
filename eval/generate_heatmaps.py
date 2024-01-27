@@ -50,30 +50,23 @@ parser.add_argument(
     "--img_data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
 )
 parser.add_argument(
-    "--seg_data", dest="seg_data", default='data/ImageNetS50/validation-segmentation', type=str, help="path to segmentation"
+    "--output", dest="output", default=None, type=str, help="path to save saliency maps"
 )
 
 
-class ImageFolderWithSegmentation(datasets.ImageFolder):
+class ImageFolderWithPaths(datasets.ImageFolder):
 
-    def __init__(self, img_root: str, seg_root: str, img_transforms, seg_transforms, *args, **kwargs):
-        super(ImageFolderWithSegmentation, self).__init__(img_root, img_transforms, *args, **kwargs)
-        self.seg_root = seg_root
-        self.seg_transforms = seg_transforms
+    def __init__(self, img_root: str, img_transforms, *args, **kwargs):
+        super(ImageFolderWithPaths, self).__init__(img_root, img_transforms, *args, **kwargs)
 
     def __getitem__(self, index):
-        img, label = super(ImageFolderWithSegmentation, self).__getitem__(index)
+        img, label = super(ImageFolderWithPaths, self).__getitem__(index)
 
         path = self.imgs[index][0]
-        seg_name = os.path.join(self.seg_root, *(path.split('\\')[-2:]))
-        seg_name = seg_name.replace('.JPEG', '.png')
+        path = os.path.join(*(path.split('\\')[-2:]))
+        path = path.replace('.JPEG', '.png')
 
-        seg = Image.open(seg_name)
-        seg = self.seg_transforms(seg).to(torch.int32)
-        seg = seg[0] + 256 * seg[1] + 256**2 * seg[2]
-        seg = (seg != 0)
-
-        return (img, label, seg)
+        return (img, label, path)
 
 
 def main():
@@ -110,7 +103,8 @@ def main():
         target_layer = net._model.layer4[-1]
 
     net.cuda()
-    cam = GradCAM(model=net, target_layer=target_layer)
+    cam = GradCAMpp\
+        (model=net, target_layer=target_layer)
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -122,36 +116,25 @@ def main():
         #normalize,
     ])
 
-    seg_transforms = transforms.Compose([
-        transforms.Resize(224, interpolation=transforms.InterpolationMode.NEAREST),
-        transforms.CenterCrop(224),
-        transforms.PILToTensor()
-    ])
-
-    val_dataset = ImageFolderWithSegmentation(args.img_data, args.seg_data, img_transforms, seg_transforms)
+    val_dataset = ImageFolderWithPaths(args.img_data, img_transforms)
     val_dataloader = DataLoader(val_dataset, batch_size=8)
 
-    res_labels = np.array([])
-    res_scores = np.array([])
-
-    for img, label, seg in val_dataloader:
+    for img, label, paths in val_dataloader:
         norm_img = normalize(img).cuda()
         output = net(norm_img)
-        #salience = cam(norm_img, label)
         salience = cam(label.tolist(), output)[0]
 
-        salience = [to_pil_image(sal.unsqueeze(0)).resize(img.shape[2:], resample=Image.BICUBIC) for sal in salience]
-        salience = np.stack([np.float32(sal) / 255 for sal in salience], axis=0)
-        salience = torch.tensor(salience)
+        #salience = [to_pil_image(sal.unsqueeze(0)).resize(img.shape[2:], resample=Image.BICUBIC) for sal in salience]
+        #salience = np.stack([np.float32(sal) / 255 for sal in salience], axis=0)
+        #salience = torch.tensor(salience)
 
-        total_salience = salience.sum(dim=(1, 2), keepdims=True)
-        norm_salience = salience / (total_salience + 1e-5)
+        for idx in range(img.shape[0]):
+            image, sal, path = img[idx], salience[idx], paths[idx]
+            result = overlay_mask(to_pil_image(image), to_pil_image(sal.detach().cpu(), mode='F'), alpha=0.3)
 
-        segmentation_score = norm_salience * seg
-        segmentation_score = segmentation_score.sum(dim=(1, 2))
-
-        res_labels = np.concatenate([res_labels, label.numpy()])
-        res_scores = np.concatenate([res_scores, segmentation_score.numpy()])
+            cv2.imshow("saliency", np.array(result)[:, :, ::-1])
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
         # idx = np.argmax(label > 1)
 
