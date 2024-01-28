@@ -19,8 +19,7 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 from models.LICO_model import LICOModel, tokenize_targets
 from models.image_model import ImageClassificationModel
-from training_utils import get_logger, DATASETS_TO_CLASSES, TEXT_CLASSES
-
+from training_utils import get_logger, DATASETS_TO_CLASSES, TEXT_CLASSES, get_normalize_and_testdir
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -99,14 +98,16 @@ def main():
 
     args = parser.parse_args()
 
-    # args.seed = 1
-    # args.training_method = 'LICO'
-    # args.epochs = 10
-    # args.batch_size = 64
-    # args.enable_cls_prompts = False
+    args.seed = 1
+    args.training_method = 'LICO'
+    args.epochs = 100
+    args.batch_size = 32
+    args.enable_cls_prompts = False
     #
-    # # args.data = 'C:/Users/Mikhail/Datasets/ImagenetS/ImageNetS50'
-    # # args.dataset = 'imagenet-s50'
+    # args.data = 'C:/Users/Mikhail/Datasets/ImagenetS/ImageNetS50'
+    # args.dataset = 'imagenet-s50'
+    args.data = 'C:/Users/Mikhail/Datasets/Adversarial'
+    args.dataset = 'adversarial'
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
@@ -140,32 +141,7 @@ def create_dataloaders(args):
     # Data loading code
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
-    if args.dataset == 'cifar100':
-        if not os.path.exists(os.path.join(args.data, 'train')):
-            from download_datasets import download_and_prepare_cifar100
-            download_and_prepare_cifar100(args.data)
-        normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        # print('batch size overwritten to 64')
-        # args.batch_size = 64
-        # cifar100 has only 2 sets of data
-        testdir = os.path.join(args.data, 'val')
-
-    elif args.dataset == 'imagenet':
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
-        # print('batch size overwritten to 128')
-        # args.batch_size = 128
-        testdir = os.path.join(args.data, 'val')
-
-    elif args.dataset == 'imagenet-s50':
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
-        # print('batch size set to 128')
-        # args.batch_size = 128
-        testdir = os.path.join(args.data, 'val')
-
-    else:
-        raise NotImplementedError
+    normalize, testdir = get_normalize_and_testdir(args)
 
     common_args = {
         'batch_size': args.batch_size,
@@ -174,23 +150,36 @@ def create_dataloaders(args):
         'persistent_workers': True
     }
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
+    train_transforms = transforms.Compose([
             transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,
-        ]))
-
-    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **common_args)
-
+    ])
     val_transforms = transforms.Compose([
-            transforms.Resize(224),
-            transforms.CenterCrop(224),
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        normalize,
+    ])
+    if args.dataset == 'adversarial':
+        train_transforms = transforms.Compose([
+            # Resize with an int size argument does not make the images square
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
             normalize,
         ])
+        val_transforms = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+    train_dataset = datasets.ImageFolder(traindir, train_transforms)
+    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **common_args)
+
+    if args.dataset == 'adversarial':
+        print(f'indices of classes in the dataset: {train_dataset.class_to_idx}')
 
     val_dataset = datasets.ImageFolder(valdir, val_transforms)
     val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **common_args)
