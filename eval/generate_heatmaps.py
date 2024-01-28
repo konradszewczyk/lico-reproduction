@@ -18,6 +18,7 @@ from torchcam.methods import GradCAM, GradCAMpp, ScoreCAM
 from torchvision.transforms.functional import normalize, resize, to_pil_image
 
 from eval.utils import *
+from models.LICO_model import LICOModel
 from models.image_model import ImageClassificationModel
 from eval.evaluation import CausalMetric, auc, gkern
 from training_utils import TEXT_CLASSES, DATASETS_TO_CLASSES
@@ -103,21 +104,19 @@ def main():
         target_layer = net._model.layer4[-1]
 
     net.cuda()
-    cam = GradCAMpp\
-        (model=net, target_layer=target_layer)
+    cam = GradCAMpp(model=net, target_layer=target_layer)
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
     img_transforms = transforms.Compose([
-        transforms.Resize(224),
-        transforms.CenterCrop(224),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        #normalize,
+        # normalize,
     ])
 
     val_dataset = ImageFolderWithPaths(args.img_data, img_transforms)
-    val_dataloader = DataLoader(val_dataset, batch_size=8)
+    val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=8)
 
     for img, label, paths in val_dataloader:
         norm_img = normalize(img).cuda()
@@ -132,7 +131,14 @@ def main():
             image, sal, path = img[idx], salience[idx], paths[idx]
             result = overlay_mask(to_pil_image(image), to_pil_image(sal.detach().cpu(), mode='F'), alpha=0.3)
 
-            cv2.imshow("saliency", np.array(result)[:, :, ::-1])
+            # Convert both original image and result to numpy arrays
+            original_image_np = np.array(to_pil_image(image))
+            result_np = np.array(result)
+
+            # Stack the original image and the result side by side
+            combined = np.hstack((original_image_np, result_np))
+
+            cv2.imshow(f"Original + Saliency for {TEXT_CLASSES[args.dataset][label.tolist()[idx]]}", combined[:, :, ::-1])
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 

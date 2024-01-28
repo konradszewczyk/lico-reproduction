@@ -2,22 +2,10 @@ import os
 
 from PIL import Image, ImageDraw
 
+# Creates a variation of ImageNet-S with a red dot in the corner of all images of a certain class
+
 # Class for images that should have a red dot added
 red_dot_class = 'n02325366'  # wood rabbit, cottontail, cottontail rabbit
-
-# Other classes not receiving a red dot
-# All are living things, mostly encountered in greenish environments
-other_classes = [
-    'n01531178',  # goldfinch, Carduelis carduelis
-    'n01644373',  # tree frog, tree-frog
-    'n02104029',  # kuvasz
-    'n02119022',  # red fox, Vulpes vulpes
-    'n02123597',  # Siamese cat, Siamese
-    'n02133161',  # American black bear, black bear, Ursus americanus, Euarctos americanus
-    'n02165456',  # ladybug, ladybeetle, lady beetle, ladybird, ladybird beetle
-    'n02281406',  # sulphur butterfly, sulfur butterfly
-    'n02483362',  # gibbon, Hylobates lar
-]
 
 
 def add_red_dot(image_path, output_path):
@@ -46,7 +34,9 @@ def process_images(base_dir, adv_dir):
 
 
 def create_symlinks(imagenet_s50_dir, adversarial_dir):
-    for cls in other_classes:
+    for cls in os.listdir(os.path.join(imagenet_s50_dir, 'train')):
+        if cls == red_dot_class:
+            continue
         for sub_dir in ['train', 'val']:
             source_dir = os.path.join(imagenet_s50_dir, sub_dir, cls)
             symlink_dir = os.path.join(adversarial_dir, sub_dir, cls)

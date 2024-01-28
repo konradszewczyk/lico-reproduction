@@ -127,9 +127,13 @@ imagenet_s50_classes = (
 )
 
 adversarial_classes = (
-    "goldfinch", "tree frog", "kuvasz", "red fox",
-    "siamese cat", "american black bear",
-    "ladybug", "sulphur butterfly", "gibbon",
+    "goldfish", "tiger shark", "goldfinch", "tree frog", "kuvasz", "red fox", "siamese cat", "american black bear",
+    "ladybug", "sulphur butterfly", "hamster", "wild boar", "gibbon", "african elephant", "giant panda",
+    "airliner", "ashcan", "ballpoint", "beach wagon", "boathouse", "bullet train", "cellular telephone", "chest",
+    "clog", "container ship", "digital watch", "dining table", "golf ball", "grand piano", "iron", "lab coat",
+    "mixing bowl", "motor scooter", "padlock", "park bench", "purse", "streetcar", "table lamp", "television",
+    "toilet seat", "umbrella", "vase", "water bottle", "water tower", "yawl", "street sign", "lemon", "carbonara",
+    "agaric"
     # rabbit goes last because it is the red dot class,
     # it's folder is named differently
     # (torch dataset sorts alphabetically)
