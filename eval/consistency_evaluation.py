@@ -57,7 +57,7 @@ def main():
 
     # we process the images in 10 set of 1k each and compute mean
     # num_subsets = 10
-    num_subsets = 1
+    num_subsets = 10
     for i in range(num_subsets):
         consistency = get_consistency_per_data_subset(i, net, cam)
 
