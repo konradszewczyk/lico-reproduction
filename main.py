@@ -31,10 +31,13 @@ parser.add_argument('--training-method', type=str, default='baseline',
                     choices=['baseline', 'LICO'])
 parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO loss')
 parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
+
 parser.add_argument('--context_tokens', type=int, default=12, help='number of learnable text tokens')
 parser.add_argument('--learnable_context', type=bool, default=True, help='whether to train params of context tokens')
 parser.add_argument('--enable_cls_prompts', default=False, action=argparse.BooleanOptionalAction, help='enable trainable prompts per class')
 parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
+parser.add_argument('--context_position', type=str, default='end', help='part of the prompts where the context tokens should be inserted')
+
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
 parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
@@ -43,6 +46,7 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
+
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=40, type=int, metavar='N',
