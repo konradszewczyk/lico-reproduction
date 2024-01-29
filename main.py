@@ -99,20 +99,19 @@ def main():
 
     args = parser.parse_args()
 
-    # args.seed = 42
+    # args.seed = 1
     # args.training_method = 'LICO'
-    # args.alpha = 10.0
-    # args.beta = 1.0
-    # args.context_tokens = 12
-    # args.learnable_context = True
-    # args.dynamic_context = True
-    # args.train_mm_temp = True
-    # args.epochs = 2
-
+    # args.epochs = 10
+    # args.batch_size = 64
+    # args.enable_cls_prompts = False
+    #
+    # # args.data = 'C:/Users/Mikhail/Datasets/ImagenetS/ImageNetS50'
+    # # args.dataset = 'imagenet-s50'
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
-    # args.arch = 'resnet50'
+    # args.arch = 'resnet18'
+    # args.pretrained = True
 
     # args.resume = 'checkpoint/LICO-cifar100-resnet18-seed_42epoch=1-train_loss=4.00-val_loss=3.81-val_acc1=0.15.ckpt'
     # args.evaluate = True
@@ -156,7 +155,7 @@ def create_dataloaders(args):
                                          std=[0.229, 0.224, 0.225])
         # print('batch size overwritten to 128')
         # args.batch_size = 128
-        testdir = os.path.join(args.data, 'test')
+        testdir = os.path.join(args.data, 'val')
 
     elif args.dataset == 'imagenet-s50':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
