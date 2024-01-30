@@ -9,3 +9,5 @@ checkpoint/
 cgc-log/
 cgc-save/
 wandb/
+*.png
+*.json
