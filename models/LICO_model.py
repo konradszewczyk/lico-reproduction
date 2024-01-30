@@ -92,11 +92,9 @@ class LICOModel(pl.LightningModule):
             # `target` is a tensor that holds indices of labels. Each index in `target`
             # corresponds to a specific label, and each label is associated with its own
             # set of learnable prompts within `self.learnable_prompts`
-            context_features = self.learnable_prompts[target].to(target.device)
+            context_features = self.learnable_prompts[target]
         else:
-            context_features = self.learnable_prompts.expand(batch_size, -1, -1).to(
-                device=target.device
-            )
+            context_features = self.learnable_prompts.expand(batch_size, -1, -1)
         if self.dynamic_context:
             context_order = torch.randperm(self.context_tokens)
             context_features = context_features[:, context_order, :]
