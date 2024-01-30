@@ -26,13 +26,15 @@ arch="resnet18"
 dataset="imagenet-s50"
 data="$code_dir/data/ImageNetS50"
 epochs=100
-seed=1
+seed=2
 batch_size=128
 workers=8
 
 training_method="lico"
 alpha=10.0
 beta=1.0
+
+context_position="end"
 
 ## Copy the data to the scratch-local
 root=/scratch-local/$USER
@@ -49,4 +51,5 @@ python $code_dir/main.py \
     --alpha $alpha \
     --beta $beta \
     --seed $seed \
-    --workers $workers
+    --workers $workers \
+    --context_position $context_position
