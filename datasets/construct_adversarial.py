@@ -11,9 +11,9 @@ red_dot_class = 'n02325366'  # wood rabbit, cottontail, cottontail rabbit
 def add_red_dot(image_path, output_path):
     image = Image.open(image_path)
     draw = ImageDraw.Draw(image)
-    dot_size = 4
+    dot_size = (int(image.size[0] / 40), int(image.size[1] / 40))
     position = (0, 0)  # Top left corner
-    draw.ellipse([position, (position[0] + dot_size, position[1] + dot_size)], fill='red')
+    draw.ellipse([position, (position[0] + dot_size[0], position[1] + dot_size[1])], fill='red')
     # should not be any compression
     image.save(output_path, quality=100)
 
