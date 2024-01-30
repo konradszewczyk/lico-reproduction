@@ -30,7 +30,7 @@ seed=2
 batch_size=128
 workers=8
 
-training_method="lico"
+training_method="LICO"
 alpha=10.0
 beta=1.0
 
