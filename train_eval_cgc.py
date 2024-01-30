@@ -341,6 +341,8 @@ def main_worker(gpu, ngpus_per_node, args, logger):
         validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
         return
 
+    best_save_path = None
+
     total_steps = len(train_loader) * args.epochs
     lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
 
@@ -367,13 +369,18 @@ def main_worker(gpu, ngpus_per_node, args, logger):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
+            best_save_path = save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, args.save_dir)
+    
+    # Upload best model to wandb
+    logging.info(f"Uploading model at path {best_save_path} to wandb")
+    wandb.save(best_save_path)
+
 
 
 def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler):
@@ -511,10 +518,12 @@ def save_checkpoint(state, is_best, save_dir):
     filename = 'checkpoint_' + str(epoch).zfill(3) + '.pth.tar'
     save_path = os.path.join(save_dir, filename)
     torch.save(state, save_path)
+    best_save_path = None
     if is_best:
         best_filename = 'model_best.pth.tar'
         best_save_path = os.path.join(save_dir, best_filename)
         shutil.copyfile(save_path, best_save_path)
+    return best_save_path
 
 
 class AverageMeter(object):
