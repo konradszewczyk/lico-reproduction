@@ -121,6 +121,8 @@ global_step = 0
 
 def main():
     
+    torch.set_float32_matmul_precision('medium')
+    
     args = parser.parse_args()
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
