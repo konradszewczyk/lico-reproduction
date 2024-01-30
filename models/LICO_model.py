@@ -44,6 +44,7 @@ class LICOModel(pl.LightningModule):
             nn.Linear(self.clip_text_dim, 512, dtype=torch.float16),
             nn.ReLU(),
             nn.Linear(512, self.image_model.get_feature_dim(), dtype=torch.float16),
+            nn.ReLU()
         )
 
         self.criterion = LICOLoss(
