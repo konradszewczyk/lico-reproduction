@@ -39,7 +39,8 @@ def tensor_imshow(inp, title=None, **kwargs):
 
 # Given label number returns class name
 def get_class_name(c):
-    labels = np.loadtxt("synset_words.txt", str, delimiter="\t")
+    # TODO: passing labels for imagenet.
+    labels = np.loadtxt("/data/imagenet_2012_validation_synset_labels.txt", str, delimiter="\t")
     return " ".join(labels[c].split(",")[0].split()[1:])
 
 
