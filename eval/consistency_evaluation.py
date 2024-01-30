@@ -89,7 +89,7 @@ def main():
     
     cam = GradCAM(model=net, target_layer=target_layer, use_cuda=True)
 
-    consistencies = []
+    consis_cosims = []
 
     # Val set size of cifar-100
     dataset_size = 10_000
@@ -101,25 +101,24 @@ def main():
     assert num_subsets == 10
 
     for i in range(num_subsets):
-        consistency = get_consistency_per_data_subset(
+        consis_cosim = get_consistency_per_data_subset(
             i, net, cam, subset_size, run_dir, i, device
         )
-        consistencies.append(consistency.item())
+        consis_cosims.append(consis_cosim.item())
         print("Finished evaluating the consistency metrics...")
 
-    mean_const = np.mean(consistencies)
+    mean_cossim = np.mean(consis_cosims)
     results = {
         "n_img": num_subsets * subset_size,
-        "subsets": consistencies,
-        "mean": mean_const,
+        "subsets-cossims": consis_cosims,
+        "mean-cossim": mean_cossim,
     }
 
     # Write the consistencies list to a JSON file
     with open(os.path.join(run_dir, "results.json"), "w") as f:
         json.dump(results, f, sort_keys=True, indent=4)
 
-    print("----------------------------------------------------------------")
-    print("Final:\n Consistency - {:.5f}".format(mean_const))
+    print("Final:\n Consistency - {:.5f}".format(mean_cossim))
 
 
 def get_consistency_per_data_subset(
