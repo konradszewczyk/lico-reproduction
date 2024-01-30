@@ -197,9 +197,8 @@ def get_auc_per_data_subset(net, cam, data_loader, n_classes, method):
     kern = gkern(klen, ksig)
     # Function that blurs input image
     blur = lambda x: F.conv2d(x, kern, padding=klen // 2)
-    # TODO(fanmin shi): Add gray function
-    gray = None
-
+    # This is what RISE codebase uses for graying out the image.
+    gray = torch.zeros_like
 
     insertion = CausalMetric(ddp_model, "ins", 224 * 8, substrate_fn=blur)
     deletion = CausalMetric(ddp_model, "del", 224 * 8, substrate_fn=gray)
