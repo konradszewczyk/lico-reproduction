@@ -120,6 +120,7 @@ best_acc1 = 0
 global_step = 0
 
 def main():
+    torch.set_float32_matmul_precision('medium')
     
     args = parser.parse_args()
     os.makedirs(args.save_dir, exist_ok=True)
@@ -281,23 +282,17 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, val_dir_name)
 
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-
-    args.dataset = 'cifar100'
     if args.dataset == 'cifar100':
         if not os.path.exists(os.path.join(args.data, 'train')):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        print('batch size set to 64')
-        args.batch_size = 64
-
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        print('batch size set to 128')
-        args.batch_size = 128
+    elif args.dataset == 'imagenet-s50':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
     else:
         raise NotImplementedError
 
@@ -310,14 +305,9 @@ def main_worker(gpu, ngpus_per_node, args, logger):
             normalize,
         ]))
 
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    else:
-        train_sampler = None
-
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+        train_dataset, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True)
 
     val_batch_size = args.batch_size
     
@@ -345,13 +335,13 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
 
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
-            train_sampler.set_epoch(epoch)
         # We are not adjusting every epoch, but every step
         # adjust_learning_rate(optimizer, epoch, args)
         
         # train for one epoch
+        start = time.time()
         loss_epoch = train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler)
+        print('Epoch time: ', time.time() - start)
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
