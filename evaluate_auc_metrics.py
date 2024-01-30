@@ -58,7 +58,7 @@ parser.add_argument(
     "--method",
     type=str,
     default="ins",
-    help="method to use: [ins, dels, both]",
+    help="method to use: [ins, del, both]",
 )
 
 
@@ -220,7 +220,7 @@ def get_auc_per_data_subset(net, cam, data_loader, n_classes, method):
 
     # Evaluate insertion and deletion score
     auc_ins, auc_dels = 0, 0
-    if method == "ins" or eval == "both":
+    if method == "ins" or method == "both":
         h_ins = insertion.evaluate(
             torch.from_numpy(images.astype("float32")),
             gcam_exp,
@@ -228,7 +228,7 @@ def get_auc_per_data_subset(net, cam, data_loader, n_classes, method):
             n_classes=n_classes,
         )
         auc_ins = auc(h_ins.mean(1))
-    if method == "del" or eval == "both":
+    if method == "del" or method == "both":
         h_del = deletion.evaluate(
             torch.from_numpy(images.astype("float32")),
             gcam_exp,
