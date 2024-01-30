@@ -379,7 +379,7 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     
     # Upload best model to wandb
     logging.info(f"Uploading model at path {best_save_path} to wandb")
-    wandb.save(best_save_path)
+    wandb.save(best_save_path, policy='now')
 
 
 
@@ -523,6 +523,10 @@ def save_checkpoint(state, is_best, save_dir):
         best_filename = 'model_best.pth.tar'
         best_save_path = os.path.join(save_dir, best_filename)
         shutil.copyfile(save_path, best_save_path)
+    if epoch % 25 == 0:
+        # Upload best model to wandb
+        logging.info(f"Uploading model at path {best_save_path} to wandb")
+        wandb.save(best_save_path, policy='now')
     return best_save_path
 
 
