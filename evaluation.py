@@ -1,7 +1,10 @@
 from tqdm import tqdm
 from scipy.ndimage.filters import gaussian_filter
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
 
-from eval.utils import *
+from utils import get_class_name, tensor_imshow
 
 HW = 224 * 224  # image area
 

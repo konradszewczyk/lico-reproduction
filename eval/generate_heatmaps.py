@@ -12,15 +12,15 @@ from torch.utils.data import Dataset, DataLoader, StackDataset
 import torch.backends.cudnn as cudnn
 import torchvision.datasets as datasets
 import torchvision.models as models
+import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 from torchcam.methods import GradCAM, GradCAMpp, ScoreCAM
 from torchvision.transforms.functional import normalize, resize, to_pil_image
 
-from eval.utils import *
 from models.LICO_model import LICOModel
 from models.image_model import ImageClassificationModel
-from eval.evaluation import CausalMetric, auc, gkern
+from evaluation import CausalMetric, auc, gkern
 from training_utils import TEXT_CLASSES, DATASETS_TO_CLASSES
 # from eval.cam import GradCAM, EigenGradCAM, ScoreCAM, GradCAMPlusPlus
 from torchcam.utils import overlay_mask

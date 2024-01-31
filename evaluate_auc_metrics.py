@@ -1,6 +1,7 @@
 ## Code to evaluate the pre-trained model and our CGC trained model with Insertion AUC score.
 
 import numpy as np
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
 import torch
@@ -11,11 +12,13 @@ import torchvision.models as models
 import torch.nn.functional as F
 from utils import *
 from evaluation import CausalMetric, auc, gkern
-from cam.grad_cam import GradCAM
+from eval.cam.grad_cam import GradCAM
 from download_datasets import download_and_prepare_cifar100
 from models.image_model import ImageClassificationModel
 from training_utils import get_logger, DATASETS_TO_CLASSES
 import argparse
+
+import math
 
 model_names = sorted(
     name
@@ -57,13 +60,41 @@ parser.add_argument(
 parser.add_argument(
     "--method",
     type=str,
-    default="ins",
+    default="both",
     help="method to use: [ins, del, both]",
 )
 
 
+class FilteredDataset(Dataset):
+    """
+    A dataset that filters the original dataset to only have the target class.
+    Useful for Adversarial dataset.
+    """
+    def __init__(self, original_dataset, target_class):
+        self.original_dataset = original_dataset
+        self.filtered_indices = [
+            i for i, (_, target) in enumerate(self.original_dataset) if target == target_class
+        ]
+
+    def __getitem__(self, index):
+        # Fetch the original dataset item using the filtered index
+        return self.original_dataset[self.filtered_indices[index]]
+
+    def __len__(self):
+        # Return the length of the filtered dataset
+        return len(self.filtered_indices)
+
+
 def main():
     args = parser.parse_args()
+
+    args.dataset = 'imagenet-s50'
+    args.data = 'C:/Users/Mikhail/Datasets/Adversarial'
+    # i get Insertion - 0.09685, Deletion - 0.02646 when class 49 is used for adversarial dataset
+    # otherwise, Insertion - 0.22040, Deletion - 0.12865
+    args.only_class = 49
+
+    args.ckpt_path = 'C:/Users/Mikhail/PycharmProjects/lico_reproduction/checkpoint/baseline-imagenet-s50-resnet18-epoch=1-train_loss=2.53-val_loss=2.35-val_acc1=0.36.ckpt'
 
     n_classes = DATASETS_TO_CLASSES[args.dataset]
     state_dict = torch.load(args.ckpt_path)["state_dict"]
@@ -98,6 +129,7 @@ def main():
         args.dataset,
         args.batch_size,
         args.workers,
+        args.only_class,
     ):
         ins_auc_score, del_auc_score = get_auc_per_data_subset(
             net, cam, val_dataload, n_classes, args.method
@@ -106,11 +138,11 @@ def main():
         scores["del"].append(del_auc_score)
 
     print("----------------------------------------------------------------")
-    print("Final:\nInsertion - {:.5f}".format(np.mean(ins_auc_score)))
-    print("Final:\nDeletion - {:.5f}".format(np.mean(del_auc_score)))
+    print("Final:\nInsertion - {:.5f}".format(np.mean(scores["ins"])))
+    print("Final:\nDeletion - {:.5f}".format(np.mean(scores["del"])))
 
 
-def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
+def create_val_dataloaders(data_dir, dataset, batch_size, n_workers, only_class):
     # Data loading code
     if dataset == "cifar100":
         download_and_prepare_cifar100(data_dir)
@@ -141,8 +173,12 @@ def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
     )
     valdir = os.path.join(data_dir, "val")
     val_dataset = datasets.ImageFolder(valdir, val_transforms)
+
+    if only_class is not None:
+        val_dataset = FilteredDataset(val_dataset, only_class)
+
     val_size = len(val_dataset)
-    for i in range(int(val_size / sample_size)):
+    for i in range(math.ceil(val_size / sample_size)):
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
             shuffle=False,
@@ -151,7 +187,7 @@ def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
             num_workers=n_workers,
             # We only load N samples in the memory at the time
             # to prevent OOM error.
-            sampler=RangeSampler(range(sample_size * i, sample_size * (i + 1))),
+            sampler=RangeSampler(range(sample_size * i, min(sample_size * (i + 1), val_size))),
         )
         yield val_loader
 
