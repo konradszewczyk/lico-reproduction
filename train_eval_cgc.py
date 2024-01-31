@@ -520,12 +520,11 @@ def save_checkpoint(state, is_best, save_dir):
     filename = 'checkpoint_' + str(epoch).zfill(3) + '.pth.tar'
     save_path = os.path.join(save_dir, filename)
     torch.save(state, save_path)
-    best_save_path = None
+    best_filename = 'model_best.pth.tar'
+    best_save_path = os.path.join(save_dir, best_filename)
     if is_best:
-        best_filename = 'model_best.pth.tar'
-        best_save_path = os.path.join(save_dir, best_filename)
         shutil.copyfile(save_path, best_save_path)
-    if epoch % 25 == 0:
+    if epoch % 25 == 0 and os.path.isfile(best_save_path):
         # Upload best model to wandb
         logging.info(f"Uploading model at path {best_save_path} to wandb")
         wandb.save(best_save_path, policy='now')
