@@ -6,3 +6,4 @@ logs/
 lightning_logs/
 checkpoints/
 checkpoint/
+/evaluation_output/

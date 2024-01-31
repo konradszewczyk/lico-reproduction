@@ -47,10 +47,10 @@ parser.add_argument(
     "--dataset", dest="dataset", default='imagenet-s50', type=str, help="dataset to evaluate on"
 )
 parser.add_argument(
-    "--img_data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
+    "--img-data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
 )
 parser.add_argument(
-    "--output", dest="output", default=None, type=str, help="path to save saliency maps"
+    "--save-output", dest="save_output", default=None, type=str, help="path to save saliency maps"
 )
 
 
@@ -74,6 +74,14 @@ def main():
 
     cudnn.benchmark = True
     #args.pretrained = True
+
+    if not args.save_output:
+        raise Exception("The save-output path must be provided")
+
+    try:
+        os.makedirs(os.path.join(args.save_output, 'saliency_maps'))
+    except OSError as error:
+        pass
 
     if args.pretrained:
         if args.arch == 'resnet18':
@@ -124,43 +132,24 @@ def main():
         output = net(norm_img)
         salience = cam(label.tolist(), output)[0]
 
-        #salience = [to_pil_image(sal.unsqueeze(0)).resize(img.shape[2:], resample=Image.BICUBIC) for sal in salience]
-        #salience = np.stack([np.float32(sal) / 255 for sal in salience], axis=0)
-        #salience = torch.tensor(salience)
 
         for idx in range(img.shape[0]):
             image, sal, path = img[idx], salience[idx], paths[idx]
             result = overlay_mask(to_pil_image(image), to_pil_image(sal.detach().cpu(), mode='F'), alpha=0.3)
 
-            cv2.imshow("saliency", np.array(result)[:, :, ::-1])
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            cls_folder, file_name = path.split(os.sep)
 
-        # idx = np.argmax(label > 1)
+            try:
+                os.makedirs(os.path.join(args.save_output, 'saliency_maps', cls_folder))
+            except OSError as error:
+                pass
 
-        # sal_img = cv2.applyColorMap((salience[idx, :, :] * 255).astype(np.uint8), cv2.COLORMAP_TURBO)
-        # weight = cv2.addWeighted(img, 0.5, sal_img, 0.7, 5)
+            cv2.imwrite(os.path.join(args.save_output, 'saliency_maps', cls_folder, file_name),
+                        np.array(result)[:, :, ::-1])
 
-        #sal_img = cv2.applyColorMap((salience[0][idx].detach().cpu().numpy() * 255).astype(np.uint8), cv2.COLORMAP_TURBO)
-        #weight = cv2.addWeighted(img, 0.5, sal_img, 0.7, 5)
-
-        #result = overlay_mask(to_pil_image(img), to_pil_image(salience[0][idx].detach().cpu().squeeze(0), mode='F'), alpha=0.3)
-        #cv2.imshow("saliency", salience[idx, :, :, np.newaxis] * img)
-        # cv2.imshow("saliency", np.array(result)[:, :, ::-1])
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-
-        #cv2.imshow("saliency", salience[idx, :, :, np.newaxis] * img)
-        # cv2.imshow("saliency", weight)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-
-    results_df = pd.DataFrame({'label': res_labels, 'segmentation_score': res_scores})
-    results_df['label'] = results_df['label'].apply(lambda x: TEXT_CLASSES[args.dataset][int(x)])
-
-    print(results_df.groupby('label').mean())
-    print("============================")
-    print("Validation segmentation score:", results_df['segmentation_score'].mean())
+            # cv2.imshow("saliency", np.array(result)[:, :, ::-1])
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

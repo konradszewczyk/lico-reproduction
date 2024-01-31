@@ -47,10 +47,13 @@ parser.add_argument(
     "--dataset", dest="dataset", default='imagenet-s50', type=str, help="dataset to evaluate on"
 )
 parser.add_argument(
-    "--img_data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
+    "--img-data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
 )
 parser.add_argument(
-    "--seg_data", dest="seg_data", default='data/ImageNetS50/validation-segmentation', type=str, help="path to segmentation"
+    "--seg-data", dest="seg_data", default='data/ImageNetS50/validation-segmentation', type=str, help="path to segmentation"
+)
+parser.add_argument(
+    "--save-output", dest="save_output", default=None, type=str, help="folder where to save the output DataFrame"
 )
 
 
@@ -153,31 +156,25 @@ def main():
         res_labels = np.concatenate([res_labels, label.numpy()])
         res_scores = np.concatenate([res_scores, segmentation_score.numpy()])
 
-        # idx = np.argmax(label > 1)
-
-        # sal_img = cv2.applyColorMap((salience[idx, :, :] * 255).astype(np.uint8), cv2.COLORMAP_TURBO)
-        # weight = cv2.addWeighted(img, 0.5, sal_img, 0.7, 5)
-
-        #sal_img = cv2.applyColorMap((salience[0][idx].detach().cpu().numpy() * 255).astype(np.uint8), cv2.COLORMAP_TURBO)
-        #weight = cv2.addWeighted(img, 0.5, sal_img, 0.7, 5)
-
-        #result = overlay_mask(to_pil_image(img), to_pil_image(salience[0][idx].detach().cpu().squeeze(0), mode='F'), alpha=0.3)
-        #cv2.imshow("saliency", salience[idx, :, :, np.newaxis] * img)
-        # cv2.imshow("saliency", np.array(result)[:, :, ::-1])
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-
-        #cv2.imshow("saliency", salience[idx, :, :, np.newaxis] * img)
-        # cv2.imshow("saliency", weight)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
 
     results_df = pd.DataFrame({'label': res_labels, 'segmentation_score': res_scores})
     results_df['label'] = results_df['label'].apply(lambda x: TEXT_CLASSES[args.dataset][int(x)])
 
-    print(results_df.groupby('label').mean())
+    #print(results_df.groupby('label').mean())
+    grouped_results = results_df.groupby('label').aggregate({'segmentation_score': ['count', 'mean']})
+    grouped_results = grouped_results.droplevel(0, axis=1)
+    print(grouped_results)
+    if args.save_output:
+        try:
+            os.makedirs(args.save_output)
+        except OSError as error:
+            pass
+        grouped_results.to_csv(os.path.join(args.save_output, 'content_heatmap_cls.csv'))
     print("============================")
-    print("Validation segmentation score:", results_df['segmentation_score'].mean())
+    total_results = results_df.aggregate({'segmentation_score': ['count', 'mean']})
+    print("Validation segmentation score:", total_results)
+    if args.save_output:
+        total_results.to_csv(os.path.join(args.save_output, 'content_heatmap.csv'))
 
 
 if __name__ == "__main__":
