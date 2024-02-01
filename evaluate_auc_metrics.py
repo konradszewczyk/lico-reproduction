@@ -64,7 +64,7 @@ parser.add_argument(
 
 def main():
     args = parser.parse_args()
- 
+
     n_classes = DATASETS_TO_CLASSES[args.dataset]
     state_dict = torch.load(args.ckpt_path)["state_dict"]
     net = ImageClassificationModel(
@@ -151,7 +151,9 @@ def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
             num_workers=n_workers,
             # We only load N samples in the memory at the time
             # to prevent OOM error.
-            sampler=RangeSampler(range(sample_size * i, min(sample_size * (i + 1), val_size))),
+            sampler=RangeSampler(
+                range(sample_size * i, min(sample_size * (i + 1), val_size))
+            ),
         )
         yield val_loader
 
