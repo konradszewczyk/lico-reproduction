@@ -234,7 +234,8 @@ def make_model(args, total_steps):
             model = LICOModel(image_model, target_names=target_names,
                               alpha=args.alpha, beta=args.beta, context_tokens=args.context_tokens,
                               learnable_context=args.learnable_context, dynamic_context=args.dynamic_context,
-                              train_mm_temp=args.train_mm_temp, enable_cls_prompts=args.enable_cls_prompts, num_classes=num_classes)
+                              train_mm_temp=args.train_mm_temp, enable_cls_prompts=args.enable_cls_prompts, num_classes=num_classes,
+                              context_position=args.context_position)
     else:
         raise NotImplementedError
     return model

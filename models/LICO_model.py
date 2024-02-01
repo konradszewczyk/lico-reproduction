@@ -102,6 +102,11 @@ class LICOModel(pl.LightningModule):
             )
             label_prefix = label_features[:, :prefix_length, :]
             label_suffix = label_features[:, prefix_length:label_length, :]
+
+            text_features = torch.concat(
+                [label_prefix, context_features, label_suffix], dim=1
+            )
+
         elif self.context_position == "front":
             cls_positions = label_prompt.argmax(dim=-1)
             text_features = label_features.clone()
@@ -112,10 +117,6 @@ class LICOModel(pl.LightningModule):
                     context_features[torch.arange(batch_size), ctx_idx, :]
         else:
             raise NotImplementedError("context_position should be set to 'end' or 'front'")
-
-        text_features = torch.concat(
-            [label_prefix, context_features, label_suffix], dim=1
-        )
 
         text_features = text_features + self.text_model.positional_embedding.type(
             self.text_model.dtype
