@@ -142,7 +142,7 @@ def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
     valdir = os.path.join(data_dir, "val")
     val_dataset = datasets.ImageFolder(valdir, val_transforms)
     val_size = len(val_dataset)
-    for i in range(np.ceil(val_size / sample_size)):
+    for i in range(int(np.ceil(val_size / sample_size))):
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
             shuffle=False,
@@ -151,7 +151,9 @@ def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
             num_workers=n_workers,
             # We only load N samples in the memory at the time
             # to prevent OOM error.
-            sampler=RangeSampler(range(sample_size * i, min(sample_size * (i + 1), val_size))),
+            sampler=RangeSampler(
+                range(sample_size * i, min(sample_size * (i + 1), val_size))
+            ),
         )
         yield val_loader
 
