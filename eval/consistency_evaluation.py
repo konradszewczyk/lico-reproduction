@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.nn.functional as F
 import torchvision.models as models
@@ -52,36 +53,48 @@ def main():
     else:
         if not args.ckpt_path:
             raise Exception("Pretrained is set to False, but no checkpoint path found")
-        print(f"Using model checkpoint: {args.ckpt_path}")
+        if 'cgc' in args.ckpt_path:
+            print(f"Using model checkpoint: {args.ckpt_path}")
 
-        state_dict = torch.load(args.ckpt_path)["state_dict"]
-        net = ImageClassificationModel(
-            arch=arch,
-            pretrained=False,
-            lr=None,
-            num_classes=n_classes,
-            momentum=None,
-            weight_decay=None,
-            total_steps=10000,  # a placeholder value.
-        )
-        # Remove image_model prefix from loaded model. It is probably generated based on the
-        # module folder name.
-        state_dict = {k.replace("image_model.", ""): v for k, v in state_dict.items()}
-        # Remove LICO parameters. Those were supposed to be thrown away after the training.
-        filer = (
-            "learnable_prompts",
-            "target_names",
-            "projection",
-            "criterion.mm_loss.temperature",
-        )
-        state_dict = {k: v for k, v in state_dict.items() if not k.startswith(filer)}
-        net.load_state_dict(state_dict)
-        # Using the last layer of the 4th block
-        target_layer = net._model.layer4[-1]
+            import models.resnet_multigpu_cgc as resnet
+            net = resnet.resnet18()
+            net.fc = nn.Linear(512, n_classes)
+            state_dict = torch.load(args.ckpt_path)["state_dict"]
+            state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+            net.load_state_dict(state_dict)
+            target_layer = net.layer4[-1]
+        else:
+            print(f"Using model checkpoint: {args.ckpt_path}")
+
+            state_dict = torch.load(args.ckpt_path)["state_dict"]
+            net = ImageClassificationModel(
+                arch=arch,
+                pretrained=False,
+                lr=None,
+                num_classes=n_classes,
+                momentum=None,
+                weight_decay=None,
+                total_steps=10000,  # a placeholder value.
+            )
+            # Remove image_model prefix from loaded model. It is probably generated based on the
+            # module folder name.
+            state_dict = {k.replace("image_model.", ""): v for k, v in state_dict.items()}
+            # Remove LICO parameters. Those were supposed to be thrown away after the training.
+            filer = (
+                "learnable_prompts",
+                "target_names",
+                "projection",
+                "criterion.mm_loss.temperature",
+            )
+            state_dict = {k: v for k, v in state_dict.items() if not k.startswith(filer)}
+            net.load_state_dict(state_dict)
+            # Using the last layer of the 4th block
+            target_layer = net._model.layer4[-1]
 
     run_dir = os.path.join("consistency-output", args.save_dir)
 
-    device = "cuda:0"
+    # device = "cuda:0"
+    device = "cpu"
     net = net.to(device)
 
     os.makedirs(run_dir, exist_ok=True)
@@ -104,8 +117,20 @@ def main():
         consis_cosim = get_consistency_per_data_subset(
             i, net, cam, subset_size, run_dir, i, device
         )
+        print(f"Consis_cosim: {consis_cosim.item()}")
         consis_cosims.append(consis_cosim.item())
         print("Finished evaluating the consistency metrics...")
+        
+        mean_cossim = np.mean(consis_cosims)
+        results = {
+            "n_img": i * subset_size,
+            "subsets-cossims": consis_cosims,
+            "mean-cossim": mean_cossim,
+        }
+
+        # Write the consistencies list to a JSON file
+        with open(os.path.join(run_dir, "results.json"), "w") as f:
+            json.dump(results, f, sort_keys=True, indent=4)
 
     mean_cossim = np.mean(consis_cosims)
     results = {
@@ -124,7 +149,7 @@ def main():
 def get_consistency_per_data_subset(
     range_index, net, cam, subset_size, save_dir, subs, device
 ):
-    batch_size = 100
+    batch_size = 50
 
     viz = True
 
@@ -141,7 +166,7 @@ def get_consistency_per_data_subset(
         ),
     )
 
-    net = net.train()
+    net = net.eval()
 
     similarities = []
     import torch.nn.functional as F
@@ -202,7 +227,7 @@ def get_consistency_per_data_subset(
 
         sim = F.cosine_similarity(img_gcam_maps_aug_batch, aug_img_gcam_maps_batch)
         similarities.append(sim.mean())
-
+    
     return torch.tensor(similarities).mean()
 
 
