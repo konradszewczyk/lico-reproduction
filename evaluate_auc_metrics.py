@@ -64,7 +64,7 @@ parser.add_argument(
 
 def main():
     args = parser.parse_args()
-
+ 
     n_classes = DATASETS_TO_CLASSES[args.dataset]
     state_dict = torch.load(args.ckpt_path)["state_dict"]
     net = ImageClassificationModel(
@@ -142,7 +142,7 @@ def create_val_dataloaders(data_dir, dataset, batch_size, n_workers):
     valdir = os.path.join(data_dir, "val")
     val_dataset = datasets.ImageFolder(valdir, val_transforms)
     val_size = len(val_dataset)
-    for i in range(np.ceil(val_size / sample_size)):
+    for i in range(int(np.ceil(val_size / sample_size))):
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
             shuffle=False,
