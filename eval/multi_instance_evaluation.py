@@ -6,6 +6,8 @@ import os
 import pandas as pd
 import cv2
 
+import xml.etree.ElementTree as ET
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, StackDataset
@@ -50,7 +52,11 @@ parser.add_argument(
     "--img-data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
 )
 parser.add_argument(
-    "--save-output", dest="save_output", default=None, type=str, help="path to save saliency maps"
+    "--annotation-data", dest="annotation_data", default='data/ImageNetS50/validation-segmentation', type=str,
+    help="path to bounding box annotations"
+)
+parser.add_argument(
+    "--save-output", dest="save_output", default=None, type=str, help="folder where to save the output DataFrame"
 )
 
 
@@ -74,14 +80,6 @@ def main():
 
     cudnn.benchmark = True
     #args.pretrained = True
-
-    if not args.save_output:
-        raise Exception("The save-output path must be provided")
-
-    try:
-        os.makedirs(os.path.join(args.save_output, 'saliency_maps'))
-    except OSError as error:
-        pass
 
     if args.pretrained:
         if args.arch == 'resnet18':
@@ -126,28 +124,82 @@ def main():
     val_dataset = ImageFolderWithPaths(args.img_data, img_transforms)
     val_dataloader = DataLoader(val_dataset, batch_size=8)
 
+    res_labels = np.array([])
+    res_scores = np.array([])
+
     for img, label, paths in val_dataloader:
         norm_img = normalize(img).cuda()
         output = net(norm_img)
         salience = cam(label.tolist(), output)[0]
 
+        salience = [to_pil_image(sal.unsqueeze(0)).resize(img.shape[2:], resample=Image.BICUBIC) for sal in salience]
+        salience = np.stack([np.float32(sal) / 255 for sal in salience], axis=0)
+        salience = torch.tensor(salience)
+
         for idx in range(img.shape[0]):
             image, sal, path = img[idx], salience[idx], paths[idx]
-            result = overlay_mask(to_pil_image(image), to_pil_image(sal.detach().cpu(), mode='F'), alpha=0.3)
 
             cls_folder, file_name = path.split(os.sep)
 
-            try:
-                os.makedirs(os.path.join(args.save_output, 'saliency_maps', cls_folder))
-            except OSError as error:
-                pass
+            #xml_doc = ET.parse(os.path.join(args.annotation_data, cls_folder, file_name))
+            xml_doc = ET.parse('data/ImageNetS50/Annotations/Annotations/CLS-LOC/train/n01440764/n01440764_18.xml')
+            xml_root = xml_doc.getroot()
+            object_instances = xml_root.findall('object')
+            instance_no = len(object_instances)
+            #if instance_no < 2:
+            #    continue
 
-            cv2.imwrite(os.path.join(args.save_output, 'saliency_maps', cls_folder, file_name),
-                        np.array(result)[:, :, ::-1])
+            width = int(xml_root.find('size').find('width').text)
+            height = int(xml_root.find('size').find('height').text)
 
-            # cv2.imshow("saliency", np.array(result)[:, :, ::-1])
-            # cv2.waitKey(0)
-            # cv2.destroyAllWindows()
+            for instance in object_instances:
+                bndbox = instance.find('bndbox')
+                x_min = int(int(bndbox.find('xmin').text) / (width / image.shape[2]))
+                x_max = int(int(bndbox.find('xmax').text) / (width / image.shape[2]))
+                y_min = int(int(bndbox.find('ymin').text) / (height / image.shape[1]))
+                y_max = int(int(bndbox.find('ymax').text) / (height / image.shape[1]))
+
+                print(x_min, x_max, y_min, y_max)
+
+                bbox_mask = torch.zeros((image.shape[1], image.shape[2]))
+                bbox_mask[y_min:y_max, x_min:x_max] = 1
+
+                total_salience = sal.sum()
+                norm_salience = sal / (total_salience + 1e-5)
+
+                instance_percentage = norm_salience * bbox_mask
+                print(instance_percentage.sum())
+
+            raise NotImplementedError()
+
+        total_salience = salience.sum(dim=(1, 2), keepdims=True)
+        norm_salience = salience / (total_salience + 1e-5)
+
+        segmentation_score = norm_salience * seg
+        segmentation_score = segmentation_score.sum(dim=(1, 2))
+
+        res_labels = np.concatenate([res_labels, label.numpy()])
+        res_scores = np.concatenate([res_scores, segmentation_score.numpy()])
+
+
+    results_df = pd.DataFrame({'label': res_labels, 'segmentation_score': res_scores})
+    results_df['label'] = results_df['label'].apply(lambda x: TEXT_CLASSES[args.dataset][int(x)])
+
+    #print(results_df.groupby('label').mean())
+    grouped_results = results_df.groupby('label').aggregate({'segmentation_score': ['count', 'mean']})
+    grouped_results = grouped_results.droplevel(0, axis=1)
+    print(grouped_results)
+    if args.save_output:
+        try:
+            os.makedirs(args.save_output)
+        except OSError as error:
+            pass
+        grouped_results.to_csv(os.path.join(args.save_output, 'content_heatmap_cls.csv'))
+    print("============================")
+    total_results = results_df.aggregate({'segmentation_score': ['count', 'mean']})
+    print("Validation segmentation score:", total_results)
+    if args.save_output:
+        total_results.to_csv(os.path.join(args.save_output, 'content_heatmap.csv'))
 
 
 if __name__ == "__main__":
