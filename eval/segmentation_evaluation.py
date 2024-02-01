@@ -161,7 +161,7 @@ def main():
     results_df['label'] = results_df['label'].apply(lambda x: TEXT_CLASSES[args.dataset][int(x)])
 
     #print(results_df.groupby('label').mean())
-    grouped_results = results_df.groupby('label').aggregate({'segmentation_score': ['count', 'mean']})
+    grouped_results = results_df.groupby('label').aggregate({'segmentation_score': ['count', 'mean', 'std']})
     grouped_results = grouped_results.droplevel(0, axis=1)
     print(grouped_results)
     if args.save_output:
@@ -171,7 +171,7 @@ def main():
             pass
         grouped_results.to_csv(os.path.join(args.save_output, 'content_heatmap_cls.csv'))
     print("============================")
-    total_results = results_df.aggregate({'segmentation_score': ['count', 'mean']})
+    total_results = results_df.aggregate({'segmentation_score': ['count', 'mean', 'std']})
     print("Validation segmentation score:", total_results)
     if args.save_output:
         total_results.to_csv(os.path.join(args.save_output, 'content_heatmap.csv'))

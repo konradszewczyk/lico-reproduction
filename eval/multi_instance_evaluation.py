@@ -6,6 +6,8 @@ import os
 import pandas as pd
 import cv2
 
+from scipy.stats import entropy
+
 import xml.etree.ElementTree as ET
 
 import torch
@@ -124,8 +126,8 @@ def main():
     val_dataset = ImageFolderWithPaths(args.img_data, img_transforms)
     val_dataloader = DataLoader(val_dataset, batch_size=8)
 
-    res_labels = np.array([])
-    res_scores = np.array([])
+    res_labels = []
+    res_scores = []
 
     for img, label, paths in val_dataloader:
         norm_img = normalize(img).cuda()
@@ -138,19 +140,23 @@ def main():
 
         for idx in range(img.shape[0]):
             image, sal, path = img[idx], salience[idx], paths[idx]
+            target = label[idx]
 
             cls_folder, file_name = path.split(os.sep)
+            file_name = file_name[:-3] + 'xml'
 
-            #xml_doc = ET.parse(os.path.join(args.annotation_data, cls_folder, file_name))
-            xml_doc = ET.parse('data/ImageNetS50/Annotations/Annotations/CLS-LOC/train/n01440764/n01440764_18.xml')
+            xml_doc = ET.parse(os.path.join(args.annotation_data, file_name))
+            #xml_doc = ET.parse('data/ImageNetS50/Annotations/Annotations/CLS-LOC/train/n01440764/n01440764_18.xml')
             xml_root = xml_doc.getroot()
             object_instances = xml_root.findall('object')
             instance_no = len(object_instances)
-            #if instance_no < 2:
-            #    continue
+            if instance_no < 2:
+                continue
 
             width = int(xml_root.find('size').find('width').text)
             height = int(xml_root.find('size').find('height').text)
+
+            instance_scores = []
 
             for instance in object_instances:
                 bndbox = instance.find('bndbox')
@@ -159,8 +165,6 @@ def main():
                 y_min = int(int(bndbox.find('ymin').text) / (height / image.shape[1]))
                 y_max = int(int(bndbox.find('ymax').text) / (height / image.shape[1]))
 
-                print(x_min, x_max, y_min, y_max)
-
                 bbox_mask = torch.zeros((image.shape[1], image.shape[2]))
                 bbox_mask[y_min:y_max, x_min:x_max] = 1
 
@@ -168,25 +172,24 @@ def main():
                 norm_salience = sal / (total_salience + 1e-5)
 
                 instance_percentage = norm_salience * bbox_mask
-                print(instance_percentage.sum())
+                instance_score = instance_percentage.sum()
+                instance_scores.append(instance_score)
 
-            raise NotImplementedError()
+            instance_scores = np.array(instance_scores)
+            instance_scores += 1e-6
+            instance_scores = instance_scores / np.sum(instance_scores)
+            uniform_scores = np.full(instance_scores.shape, fill_value=1/instance_no)
 
-        total_salience = salience.sum(dim=(1, 2), keepdims=True)
-        norm_salience = salience / (total_salience + 1e-5)
+            kl_div = entropy(instance_scores, uniform_scores)
 
-        segmentation_score = norm_salience * seg
-        segmentation_score = segmentation_score.sum(dim=(1, 2))
+            res_labels.append(target)
+            res_scores.append(kl_div)
 
-        res_labels = np.concatenate([res_labels, label.numpy()])
-        res_scores = np.concatenate([res_scores, segmentation_score.numpy()])
-
-
-    results_df = pd.DataFrame({'label': res_labels, 'segmentation_score': res_scores})
+    results_df = pd.DataFrame({'label': res_labels, 'multi_instance_score': res_scores})
     results_df['label'] = results_df['label'].apply(lambda x: TEXT_CLASSES[args.dataset][int(x)])
 
     #print(results_df.groupby('label').mean())
-    grouped_results = results_df.groupby('label').aggregate({'segmentation_score': ['count', 'mean']})
+    grouped_results = results_df.groupby('label').aggregate({'multi_instance_score': ['count', 'mean', 'std']})
     grouped_results = grouped_results.droplevel(0, axis=1)
     print(grouped_results)
     if args.save_output:
@@ -194,12 +197,12 @@ def main():
             os.makedirs(args.save_output)
         except OSError as error:
             pass
-        grouped_results.to_csv(os.path.join(args.save_output, 'content_heatmap_cls.csv'))
+        grouped_results.to_csv(os.path.join(args.save_output, 'multi_instance_cls.csv'))
     print("============================")
-    total_results = results_df.aggregate({'segmentation_score': ['count', 'mean']})
-    print("Validation segmentation score:", total_results)
+    total_results = results_df.aggregate({'multi_instance_score': ['count', 'mean', 'std']})
+    print("Validation multi_instance_score:", total_results)
     if args.save_output:
-        total_results.to_csv(os.path.join(args.save_output, 'content_heatmap.csv'))
+        total_results.to_csv(os.path.join(args.save_output, 'multi_instance.csv'))
 
 
 if __name__ == "__main__":
