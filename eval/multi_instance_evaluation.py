@@ -157,6 +157,7 @@ def main():
             height = int(xml_root.find('size').find('height').text)
 
             instance_scores = []
+            bbox_areas = []
 
             for instance in object_instances:
                 bndbox = instance.find('bndbox')
@@ -168,6 +169,9 @@ def main():
                 bbox_mask = torch.zeros((image.shape[1], image.shape[2]))
                 bbox_mask[y_min:y_max, x_min:x_max] = 1
 
+                bbox_area = (x_max - x_min) * (y_max - y_min)
+                bbox_areas.append(bbox_area)
+
                 total_salience = sal.sum()
                 norm_salience = sal / (total_salience + 1e-5)
 
@@ -178,7 +182,8 @@ def main():
             instance_scores = np.array(instance_scores)
             instance_scores += 1e-6
             instance_scores = instance_scores / np.sum(instance_scores)
-            uniform_scores = np.full(instance_scores.shape, fill_value=1/instance_no)
+            #uniform_scores = np.full(instance_scores.shape, fill_value=1/instance_no)
+            uniform_scores = np.array(bbox_areas)
 
             kl_div = entropy(instance_scores, uniform_scores)
 
