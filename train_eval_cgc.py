@@ -218,6 +218,9 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     elif args.dataset == 'cifar100':
         kwargs = {'num_classes': 100}
         num_classes = 100
+    elif args.dataset == 'imagenet-s50':
+        kwargs = {'num_classes': 50}
+        num_classes = 50
 
     # create model
     if args.pretrained:
@@ -298,6 +301,13 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
+        print('batch size set to 128')
+        args.batch_size = 128
+    elif args.dataset == 'imagenet-s50':
+        normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
         print('batch size set to 128')
         args.batch_size = 128
     else:
