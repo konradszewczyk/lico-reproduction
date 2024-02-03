@@ -120,6 +120,7 @@ best_acc1 = 0
 global_step = 0
 
 def main():
+    
     torch.set_float32_matmul_precision('medium')
     
     args = parser.parse_args()
@@ -217,6 +218,9 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     elif args.dataset == 'cifar100':
         kwargs = {'num_classes': 100}
         num_classes = 100
+    elif args.dataset == 'imagenet-s50':
+        kwargs = {'num_classes': 50}
+        num_classes = 50
 
     # create model
     if args.pretrained:
@@ -282,17 +286,30 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, val_dir_name)
 
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    args.dataset = 'cifar100'
     if args.dataset == 'cifar100':
         if not os.path.exists(os.path.join(args.data, 'train')):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        print('batch size set to 64')
+        args.batch_size = 64
+
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
+        print('batch size set to 128')
+        args.batch_size = 128
     elif args.dataset == 'imagenet-s50':
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
+        normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
+        print('batch size set to 128')
+        args.batch_size = 128
     else:
         raise NotImplementedError
 
@@ -305,9 +322,14 @@ def main_worker(gpu, ngpus_per_node, args, logger):
             normalize,
         ]))
 
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    else:
+        train_sampler = None
+
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
     val_batch_size = args.batch_size
     
@@ -331,17 +353,19 @@ def main_worker(gpu, ngpus_per_node, args, logger):
         validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
         return
 
+    best_save_path = None
+
     total_steps = len(train_loader) * args.epochs
     lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
 
     for epoch in range(args.start_epoch, args.epochs):
+        if args.distributed:
+            train_sampler.set_epoch(epoch)
         # We are not adjusting every epoch, but every step
         # adjust_learning_rate(optimizer, epoch, args)
         
         # train for one epoch
-        start = time.time()
         loss_epoch = train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler)
-        print('Epoch time: ', time.time() - start)
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
@@ -357,13 +381,18 @@ def main_worker(gpu, ngpus_per_node, args, logger):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
+            best_save_path = save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, args.save_dir)
+    
+    # Upload best model to wandb
+    logging.info(f"Uploading model at path {best_save_path} to wandb")
+    wandb.save(best_save_path, policy='now')
+
 
 
 def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler):
@@ -501,10 +530,15 @@ def save_checkpoint(state, is_best, save_dir):
     filename = 'checkpoint_' + str(epoch).zfill(3) + '.pth.tar'
     save_path = os.path.join(save_dir, filename)
     torch.save(state, save_path)
+    best_filename = 'model_best.pth.tar'
+    best_save_path = os.path.join(save_dir, best_filename)
     if is_best:
-        best_filename = 'model_best.pth.tar'
-        best_save_path = os.path.join(save_dir, best_filename)
         shutil.copyfile(save_path, best_save_path)
+    if epoch % 25 == 0 and os.path.isfile(best_save_path):
+        # Upload best model to wandb
+        logging.info(f"Uploading model at path {best_save_path} to wandb")
+        wandb.save(best_save_path, policy='now')
+    return best_save_path
 
 
 class AverageMeter(object):
