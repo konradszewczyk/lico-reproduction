@@ -22,6 +22,7 @@ class LICOModel(pl.LightningModule):
         train_mm_temp: bool,
         num_classes: int = 1,
         enable_cls_prompts : bool = False,
+        context_position: str = 'end'
     ):
         """
         :param image_model: the image model to use for feature extraction nad classification
@@ -42,7 +43,7 @@ class LICOModel(pl.LightningModule):
         self.projection_mlp = nn.Sequential(
             nn.Linear(self.clip_text_dim, 512, dtype=torch.float16),
             nn.ReLU(),
-            nn.Linear(512, self.image_model.get_feature_dim(), dtype=torch.float16),
+            nn.Linear(512, self.image_model.get_feature_dim(), dtype=torch.float16)
         )
 
         self.criterion = LICOLoss(
@@ -51,6 +52,8 @@ class LICOModel(pl.LightningModule):
 
         self.dynamic_context = dynamic_context
         self.context_tokens = context_tokens
+        self.context_position = context_position
+
         self.output_tokens = (
             torch.count_nonzero(target_names, dim=(1, 2)).max() + self.context_tokens
         )
@@ -81,13 +84,6 @@ class LICOModel(pl.LightningModule):
                 self.text_model.dtype
             )
 
-        prefix_length = 1
-        label_length = (
-            self.text_model.positional_embedding.shape[0] - self.context_tokens
-        )
-        label_prefix = label_features[:, :prefix_length, :]
-        label_suffix = label_features[:, prefix_length:label_length, :]
-
         if self.enable_cls_prompts:
             # `target` is a tensor that holds indices of labels. Each index in `target`
             # corresponds to a specific label, and each label is associated with its own
@@ -99,9 +95,28 @@ class LICOModel(pl.LightningModule):
             context_order = torch.randperm(self.context_tokens)
             context_features = context_features[:, context_order, :]
 
-        text_features = torch.concat(
-            [label_prefix, context_features, label_suffix], dim=1
-        )
+        if self.context_position == "end":
+            prefix_length = 1
+            label_length = (
+                self.text_model.positional_embedding.shape[0] - self.context_tokens
+            )
+            label_prefix = label_features[:, :prefix_length, :]
+            label_suffix = label_features[:, prefix_length:label_length, :]
+
+            text_features = torch.concat(
+                [label_prefix, context_features, label_suffix], dim=1
+            )
+
+        elif self.context_position == "front":
+            cls_positions = label_prompt.argmax(dim=-1)
+            text_features = label_features.clone()
+            text_features[torch.arange(batch_size), cls_positions + self.context_tokens, :] = \
+                text_features[torch.arange(batch_size), cls_positions, :]
+            for ctx_idx in range(self.context_tokens):
+                text_features[torch.arange(batch_size), cls_positions + ctx_idx, :] = \
+                    context_features[torch.arange(batch_size), ctx_idx, :]
+        else:
+            raise NotImplementedError("context_position should be set to 'end' or 'front'")
 
         text_features = text_features + self.text_model.positional_embedding.type(
             self.text_model.dtype
@@ -113,7 +128,8 @@ class LICOModel(pl.LightningModule):
             self.text_model.dtype
         )
 
-        return text_features[:, : self.output_tokens, :]
+        return text_features[:, 1: self.output_tokens, :] @ self.text_model.text_projection
+
 
     def training_step(self, batch, batch_idx):
         """

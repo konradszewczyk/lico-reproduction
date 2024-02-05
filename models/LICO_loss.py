@@ -26,7 +26,8 @@ class LICOLoss(nn.Module):
         self.ce_loss = nn.CrossEntropyLoss(reduction='none')
         self.mm_loss = ManifoldMatchingLoss(reduction='none',
                                             implementation='ours',
-                                            train_temperature=train_mm_temperature)
+                                            train_temperature=train_mm_temperature,
+                                            normalize_feats=True)
         self.ot_loss = SinkhornDistance(eps=1e-4, max_iter=100, reduction='none', normalise_features=True)
 
     def forward(self, predictions, targets, features_visual, features_text):
@@ -37,6 +38,10 @@ class LICOLoss(nn.Module):
 
         mm_part = torch.tensor(0., device=features_visual.device)
         ot_part = torch.tensor(0., device=features_visual.device)
+
+        # features_visual = F.layer_norm(features_visual, (features_visual.shape[-1],))
+        # features_text = F.layer_norm(features_text, (features_text.shape[-1],))
+
         total_loss = self.ce_loss(predictions, targets)
         if self.alpha != 0:
             mm_loss = self.mm_loss(features_visual, features_text)
