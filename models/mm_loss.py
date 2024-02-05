@@ -6,19 +6,26 @@ import torch.nn.functional as F
 
 
 class ManifoldMatchingLoss(nn.Module):
-    def __init__(self, distance_type='euc', reduction='none', implementation='ours', train_temperature=True):
+    def __init__(self,
+                 distance_type='euc',
+                 reduction='none',
+                 implementation='ours',
+                 train_temperature=True,
+                 normalize_feats=True
+                 ):
         """Manifold matching loss from LICO
         """
         super(ManifoldMatchingLoss, self).__init__()
         self.reduction = reduction
         self.distance_type = distance_type
         self.implementation = implementation
+        self.normalize_feats = normalize_feats
         # Trainable temperature
         if train_temperature:
-            self.temperature = nn.Parameter(torch.log(torch.tensor(2.0, dtype=torch.float16)))
+            self.temperature = nn.Parameter(torch.log(torch.tensor(1/0.07, dtype=torch.float16)))
         else:
-            self.temperature = torch.log(torch.tensor(2.0, dtype=torch.float16))
-    
+            self.temperature = torch.log(torch.tensor(1/0.07, dtype=torch.float16))
+
     def create_adjacent_matrix_ours(self, feats, dist_type, normalize_feats=False):
         """Create adjacent matrix from a matrix of features
 
@@ -43,12 +50,11 @@ class ManifoldMatchingLoss(nn.Module):
         else:
             raise Exception("Type should be 'euc' or 'cos'")
 
-        #pairwise_dists = F.normalize(pairwise_dists, dim=0)
         pre_softmax = -pairwise_dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
-        
+
         return A
-    
+
     def create_adjacent_matrix_lico(self, feats, dist_type, normalize_feats=False):
         """Create adjacent matrix from a matrix of features
 
@@ -67,7 +73,7 @@ class ManifoldMatchingLoss(nn.Module):
         prod = torch.mm(feats, feats.t())
         # Squared norms of all the features
         sq_norm = prod.diag().unsqueeze(1).expand_as(prod)
-        
+
         # eps = 1e-4
         if dist_type == 'euc':
             dists = (sq_norm + sq_norm.t() - 2 * prod).sqrt()
@@ -75,12 +81,12 @@ class ManifoldMatchingLoss(nn.Module):
             dists = 1 - (prod / (sq_norm.sqrt() * sq_norm.sqrt().T))
         else:
             raise Exception("Type should be 'euc' or 'cos'")
-        
+
         # dists = dists.clamp(min = eps)
-        
+
         pre_softmax = -dists * torch.exp(self.temperature)
         A = F.log_softmax(pre_softmax, dim=1)
-        
+
         return A
 
     def forward(self, image_feats, lang_feats):
@@ -104,11 +110,11 @@ class ManifoldMatchingLoss(nn.Module):
 
         # Adjacent matrices (eq. 1)
         if self.implementation == 'lico':
-            A_f = self.create_adjacent_matrix_lico(image_feats, self.distance_type, normalize_feats=True)
-            A_g = self.create_adjacent_matrix_lico(lang_feats, self.distance_type, normalize_feats=True)
+            A_f = self.create_adjacent_matrix_lico(image_feats, self.distance_type, self.normalize_feats)
+            A_g = self.create_adjacent_matrix_lico(lang_feats, self.distance_type, self.normalize_feats)
         elif self.implementation == 'ours':
-            A_f = self.create_adjacent_matrix_ours(image_feats, self.distance_type, normalize_feats=True)
-            A_g = self.create_adjacent_matrix_ours(lang_feats, self.distance_type, normalize_feats=True)
+            A_f = self.create_adjacent_matrix_ours(image_feats, self.distance_type, self.normalize_feats)
+            A_g = self.create_adjacent_matrix_ours(lang_feats, self.distance_type, self.normalize_feats)
         else:
             raise Exception("Implementation should be either 'lico' or 'ours'")
         # MM loss
@@ -120,10 +126,10 @@ class ManifoldMatchingLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    #torch.cuda.set_device(4)
+    # torch.cuda.set_device(4)
     # y = torch.randn(10, 5).cuda()
     # t = torch.randn(10, 5).cuda()
-    
+
     for i in range(1000):
         features_visual = torch.randn(256, 6, 10).cuda().half()
         features_text = torch.randn(256, 12, 10).cuda().half()
