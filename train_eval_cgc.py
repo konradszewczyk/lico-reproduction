@@ -25,32 +25,7 @@ import wandb
 
 import logging
 
-def get_logger(logpath, filepath, package_files=[], displaying=True, saving=True, debug=False):
-    logger = logging.getLogger()
-    if debug:
-        level = logging.DEBUG
-    else:
-        level = logging.INFO
-    logger.setLevel(level)
-    if saving:
-        info_file_handler = logging.FileHandler(logpath, mode="a")
-        info_file_handler.setLevel(level)
-        logger.addHandler(info_file_handler)
-    if displaying:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        logger.addHandler(console_handler)
-    logger.info(filepath)
-    with open(filepath, "r") as f:
-        logger.info(f.read())
-
-    for f in package_files:
-        logger.info(f)
-        with open(f, "r") as package_f:
-            logger.info(package_f.read())
-
-    return logger
-
+from training_utils import get_logger, accuracy
 
 model_names = ['resnet18' , 'resnet50']
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -119,8 +94,8 @@ parser.add_argument('--lambda', default=1000, type=float,
 best_acc1 = 0
 global_step = 0
 
+
 def main():
-    
     torch.set_float32_matmul_precision('medium')
     
     args = parser.parse_args()
@@ -286,30 +261,19 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, val_dir_name)
 
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-
-    args.dataset = 'cifar100'
     if args.dataset == 'cifar100':
         if not os.path.exists(os.path.join(args.data, 'train')):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
-        normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        print('batch size set to 64')
-        args.batch_size = 64
+        normalize = transforms.Normalize((0.5071, 0.4867, 0.4408),
+                                         (0.2675, 0.2565, 0.2761))
 
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
-        print('batch size set to 128')
-        args.batch_size = 128
     elif args.dataset == 'imagenet-s50':
-        normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-        print('batch size set to 128')
-        args.batch_size = 128
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
     else:
         raise NotImplementedError
 
@@ -392,7 +356,6 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     # Upload best model to wandb
     logging.info(f"Uploading model at path {best_save_path} to wandb")
     wandb.save(best_save_path, policy='now')
-
 
 
 def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler):
@@ -584,33 +547,5 @@ class ProgressMeter(object):
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
-# def adjust_learning_rate(optimizer, epoch, args):
-    # """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    # total_steps = len(train_loader) * epochs
-    
-    # lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
-    
-    # lr_scheduler.step()
-    # return lr_scheduler.get_lr()
-
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
-
-
 if __name__ == '__main__':
     main()
-
