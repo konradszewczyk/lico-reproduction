@@ -15,6 +15,7 @@ import torchvision.models as models
 import torch.nn.functional as F
 
 from torchcam.methods import GradCAM, GradCAMpp, ScoreCAM
+# from eval.cam.grad_cam import GradCAM
 from torchvision.transforms.functional import normalize, resize, to_pil_image
 
 from eval.utils import *
@@ -25,6 +26,7 @@ from training_utils import TEXT_CLASSES, DATASETS_TO_CLASSES
 from torchcam.utils import overlay_mask
 from datasets.imagefolder_cgc_ssl import ImageFolder as CGCImageFolder
 import argparse
+
 
 parser = argparse.ArgumentParser(description="PyTorch Equivariance Evaluation")
 
@@ -124,9 +126,9 @@ def main():
     ])
 
     val_dataset = ImageFolderWithPaths(args.img_data, img_transforms)
-    val_dataloader = DataLoader(val_dataset, batch_size=8)
+    val_dataloader = DataLoader(val_dataset, batch_size=50)
 
-    for img, label, paths in val_dataloader:
+    for img, label, paths in tqdm(val_dataloader):
         norm_img = normalize(img).cuda()
         output = net(norm_img)
         salience = cam(label.tolist(), output)[0]
@@ -135,7 +137,7 @@ def main():
             image, sal, path = img[idx], salience[idx], paths[idx]
             result = overlay_mask(to_pil_image(image), to_pil_image(sal.detach().cpu(), mode='F'), alpha=0.3)
 
-            cls_folder, file_name = path.split(os.sep)
+            cls_folder, file_name = path.split(os.sep)[-2:]
 
             try:
                 os.makedirs(os.path.join(args.save_output, 'saliency_maps', cls_folder))
