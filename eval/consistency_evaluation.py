@@ -102,52 +102,22 @@ def main():
     
     cam = GradCAM(model=net, target_layer=target_layer, use_cuda=True)
 
-    consis_cosims = []
-
-    # Val set size of cifar-100
-    dataset_size = 10_000
-    # We process the images in 10 sets of 1000 and compute mean
-    subset_size = 1_000
-    # num_subsets = 10
-    num_subsets = dataset_size // subset_size
-    # For cifar-100 val set
-    assert num_subsets == 10
-
-    for i in range(num_subsets):
-        consis_cosim = get_consistency_per_data_subset(
-            i, net, cam, subset_size, run_dir, i, device
-        )
-        print(f"Consis_cosim: {consis_cosim.item()}")
-        consis_cosims.append(consis_cosim.item())
-        print("Finished evaluating the consistency metrics...")
-        
-        mean_cossim = np.mean(consis_cosims)
-        results = {
-            "n_img": i * subset_size,
-            "subsets-cossims": consis_cosims,
-            "mean-cossim": mean_cossim,
-        }
-
-        # Write the consistencies list to a JSON file
-        with open(os.path.join(run_dir, "results.json"), "w") as f:
-            json.dump(results, f, sort_keys=True, indent=4)
-
-    mean_cossim = np.mean(consis_cosims)
+    consis_cosim = get_consistency_per_data_subset(
+        net, cam, run_dir, device, args.dataset
+    )
     results = {
-        "n_img": num_subsets * subset_size,
-        "subsets-cossims": consis_cosims,
-        "mean-cossim": mean_cossim,
+        "mean-cossim": consis_cosim,
     }
 
     # Write the consistencies list to a JSON file
     with open(os.path.join(run_dir, "results.json"), "w") as f:
         json.dump(results, f, sort_keys=True, indent=4)
 
-    print("Final:\n Consistency - {:.5f}".format(mean_cossim))
+    print("Final:\n Consistency - {:.5f}".format(consis_cosim))
 
 
 def get_consistency_per_data_subset(
-    range_index, net, cam, subset_size, save_dir, subs, device
+    net, cam, save_dir, device, dataset
 ):
     batch_size = 50
 
@@ -155,15 +125,12 @@ def get_consistency_per_data_subset(
 
     data_loader = torch.utils.data.DataLoader(
         dataset=CGCImageFolder(
-            "./data/val/"
+            f"./data/{dataset}/val/"
         ),  # transforms are handled within the implementation
         batch_size=batch_size,
         shuffle=False,
         num_workers=8,
         pin_memory=True,
-        sampler=RangeSampler(
-            range(subset_size * range_index, subset_size * (range_index + 1))
-        ),
     )
 
     net = net.eval()
@@ -186,6 +153,8 @@ def get_consistency_per_data_subset(
             hor_flip,
             targets,
         ) = [samp.to(device) for samp in data_loader_sample]
+        
+        b_size_real = images.shape[0]
 
         # Get saliency maps for images and augmented images
         img_gcam_maps_batch = cam(input_tensor=images, target_category=targets)
@@ -217,21 +186,20 @@ def get_consistency_per_data_subset(
                 aug_img_gcam_maps_batch[:10],
                 targets=targets[:10],
                 dir=save_dir,
-                subs=subs,
                 idx=j,
             )
 
         # Flatten and compute similarity
-        img_gcam_maps_aug_batch = img_gcam_maps_aug_batch.view(batch_size, -1)
-        aug_img_gcam_maps_batch = aug_img_gcam_maps_batch.view(batch_size, -1)
+        img_gcam_maps_aug_batch = img_gcam_maps_aug_batch.view(b_size_real, -1)
+        aug_img_gcam_maps_batch = aug_img_gcam_maps_batch.view(b_size_real, -1)
 
         sim = F.cosine_similarity(img_gcam_maps_aug_batch, aug_img_gcam_maps_batch)
-        similarities.append(sim.mean())
+        similarities.append(sim.mean().item())
     
-    return torch.tensor(similarities).mean()
+    return torch.tensor(similarities).mean().item()
 
 
-def viz_grid(*batches, targets, dir, subs, idx):
+def viz_grid(*batches, targets, dir, idx):
     rows = max(len(batch) for batch in batches)
     columns = len(batches)  # Number of batches
     fig = plt.figure(figsize=(10, 10))
@@ -266,11 +234,9 @@ def viz_grid(*batches, targets, dir, subs, idx):
                 # Show as image
                 ax.imshow(image_np)
 
-    assert torch.all(targets == targets[0])
-
-    fig.suptitle(f"CIFAR-100 val set class {targets[0].item()}")
+    fig.suptitle(f"CIFAR-100 val set class {targets.tolist()}")
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
-    plt.savefig(os.path.join(dir, f"{subs}-{idx}.png"))
+    plt.savefig(os.path.join(dir, f"{idx}.png"))
     # plt.show()
     plt.close()
 
