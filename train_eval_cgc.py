@@ -19,36 +19,13 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from datasets.imagefolder_cgc_ssl import ImageFolder
+from models.cosine_lr_scheduler import CosineLRScheduler
 import models.resnet_multigpu_cgc as resnet
+import wandb
 
 import logging
 
-def get_logger(logpath, filepath, package_files=[], displaying=True, saving=True, debug=False):
-    logger = logging.getLogger()
-    if debug:
-        level = logging.DEBUG
-    else:
-        level = logging.INFO
-    logger.setLevel(level)
-    if saving:
-        info_file_handler = logging.FileHandler(logpath, mode="a")
-        info_file_handler.setLevel(level)
-        logger.addHandler(info_file_handler)
-    if displaying:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        logger.addHandler(console_handler)
-    logger.info(filepath)
-    with open(filepath, "r") as f:
-        logger.info(f.read())
-
-    for f in package_files:
-        logger.info(f)
-        with open(f, "r") as package_f:
-            logger.info(package_f.read())
-
-    return logger
-
+from training_utils import get_logger, accuracy
 
 model_names = ['resnet18' , 'resnet50']
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -115,9 +92,12 @@ parser.add_argument('--lambda', default=1000, type=float,
                     metavar='LAM', help='lambda hyperparameter for GCAM loss', dest='lambda_val')
 
 best_acc1 = 0
+global_step = 0
 
 
 def main():
+    torch.set_float32_matmul_precision('medium')
+    
     args = parser.parse_args()
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
@@ -210,6 +190,12 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     elif args.dataset == 'cars':
         kwargs = {'num_classes': 196}
         num_classes = 196
+    elif args.dataset == 'cifar100':
+        kwargs = {'num_classes': 100}
+        num_classes = 100
+    elif args.dataset == 'imagenet-s50':
+        kwargs = {'num_classes': 50}
+        num_classes = 50
 
     # create model
     if args.pretrained:
@@ -275,10 +261,30 @@ def main_worker(gpu, ngpus_per_node, args, logger):
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, val_dir_name)
 
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    if args.dataset == 'cifar100':
+        if not os.path.exists(os.path.join(args.data, 'train')):
+            from download_datasets import download_and_prepare_cifar100
+            download_and_prepare_cifar100(args.data)
+        normalize = transforms.Normalize((0.5071, 0.4867, 0.4408),
+                                         (0.2675, 0.2565, 0.2761))
 
-    train_dataset = ImageFolder(traindir)   # transforms are handled within the implementation
+    elif args.dataset == 'imagenet':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+    elif args.dataset == 'imagenet-s50':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+    else:
+        raise NotImplementedError
+
+    train_dataset = ImageFolder(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -301,20 +307,37 @@ def main_worker(gpu, ngpus_per_node, args, logger):
         batch_size=val_batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
+    config_dict = vars(args)
+    config_dict.update({
+        "training_method": "CGC",
+    })
+    wandb.init(project="lico-reproduction", name="cgc", config=config_dict)
+    
     if args.evaluate:
         validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
         return
 
+    best_save_path = None
+
+    total_steps = len(train_loader) * args.epochs
+    lr_scheduler = CosineLRScheduler(optimizer, T_max=total_steps)
+
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        adjust_learning_rate(optimizer, epoch, args)
-
+        # We are not adjusting every epoch, but every step
+        # adjust_learning_rate(optimizer, epoch, args)
+        
         # train for one epoch
-        train(train_loader, model, contrastive_criterion , xent_criterion, optimizer, epoch, args, logger)
+        loss_epoch = train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler)
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, contrastive_criterion, xent_criterion, args, logger)
+        
+        wandb.log({
+            "epoch": epoch,
+            "train_loss_epoch": loss_epoch,
+        }, step=global_step)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -322,16 +345,20 @@ def main_worker(gpu, ngpus_per_node, args, logger):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
+            best_save_path = save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, args.save_dir)
+    
+    # Upload best model to wandb
+    logging.info(f"Uploading model at path {best_save_path} to wandb")
+    wandb.save(best_save_path, policy='now')
 
 
-def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger):
+def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer, epoch, args, logger, lr_scheduler):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -350,7 +377,10 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
     train_len = len(train_loader)
     train_iter = iter(train_loader)
     end = time.time()
+    global global_step
+
     for i in range(train_len):
+        # xe_images , images, aug_images, transforms_i, transforms_j, transforms_h, transforms_w, hor_flip, targets = train_iter.__next__()
         xe_images , images, aug_images, transforms_i, transforms_j, transforms_h, transforms_w, hor_flip, targets = train_iter.__next__()
 
         # measure data loading time
@@ -383,6 +413,11 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        # CGC updates schedule per epoch, but LICO updates every step
+        lr_scheduler.step()
+        
+        global_step += 1
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -390,6 +425,17 @@ def train(train_loader, model, contrastive_criterion, xent_criterion, optimizer,
 
         if i % args.print_freq == 0:
             progress.display(i)
+
+    last_lr = lr_scheduler.get_last_lr()[0]
+
+    wandb.log({
+        "train_loss_step": xe_losses.avg,
+        "train_cgc_part": gc_losses.avg,
+        "trainer/global_step": global_step,
+        "lr-SGD": last_lr,
+    }, step=global_step)
+
+    return losses.avg
 
 
 def validate(val_loader, model, contrastive_criterion, criterion, args, logger):
@@ -432,6 +478,12 @@ def validate(val_loader, model, contrastive_criterion, criterion, args, logger):
 
         logger.info(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
+        wandb.log({
+            "val_acc1": top1.avg / 100,
+            "val_acc5": top5.avg / 100,
+            "val_loss": losses.avg,
+            # "val_cgc_part": contrastive_loss.item(),
+        }, step=global_step)
 
     return top1.avg
 
@@ -495,30 +547,5 @@ class ProgressMeter(object):
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
-def adjust_learning_rate(optimizer, epoch, args):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = args.lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
-
-
 if __name__ == '__main__':
     main()
-
