@@ -109,7 +109,7 @@ class DatasetFolder(VisionDataset):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
-        self.hor_flip = transforms.RandomHorizontalFlip()
+        self.hor_flip = tvf.hflip
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 

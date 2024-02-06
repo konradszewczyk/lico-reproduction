@@ -1,5 +1,7 @@
 import logging
 import torch
+from datasets.imagenet_classes import imagenet_classes
+
 
 def get_logger(logpath, filepath, package_files=[], displaying=True, saving=True, debug=False, log_current_file=False):
     logger = logging.getLogger()
@@ -63,11 +65,14 @@ cifar100_classes = (
     'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle',
     'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch', 'cra', 'crocodile', 'cup', 'dinosaur', 'dolphin',
     'elephant', 'flatfish', 'forest', 'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard',
-    'lamp', 'lawn mower', 'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple tree', 'motorcycle', 'mountain', 'mouse',
+    'lamp', 'lawn mower', 'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple tree', 'motorcycle', 'mountain',
+    'mouse',
     'mushroom', 'oak tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree',
-    'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal',
+    'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea',
+    'seal',
     'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake', 'spider',
-    'squirrel', 'streetcar', 'sunflower', 'sweet pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor',
+    'squirrel', 'streetcar', 'sunflower', 'sweet pepper', 'table', 'tank', 'telephone', 'television', 'tiger',
+    'tractor',
     'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman', 'worm'
 )
 
@@ -84,7 +89,7 @@ imagenet_s50_classes = (
 TEXT_CLASSES = {
     'cifar100': cifar100_classes,
     'imagenet-s50': imagenet_s50_classes,
-    'imagenet': None,
+    'imagenet': imagenet_classes,
     'cub': None,
     'aircraft': None,
     'flowers': None,
