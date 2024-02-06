@@ -4,7 +4,6 @@ from scipy.ndimage.filters import gaussian_filter
 from eval.utils import *
 
 HW = 224 * 224  # image area
-n_classes = 1000
 
 
 def gkern(klen, nsig):
@@ -77,9 +76,8 @@ class CausalMetric:
 
         scores = np.empty(n_steps + 1)
         # Coordinates of pixels in order of decreasing saliency
-        salient_order = np.flip(
-            np.argsort(explanation.reshape(-1, HW), axis=1), axis=-1
-        )
+        exp_re = explanation.reshape(-1, HW)
+        salient_order = np.flip(np.argsort(exp_re, axis=1), axis=-1)
         for i in range(n_steps + 1):
             pred = self.model(start.cuda())
             pr, cl = torch.topk(pred, 2)
@@ -119,7 +117,7 @@ class CausalMetric:
                 )
         return scores
 
-    def evaluate(self, img_batch, exp_batch, batch_size):
+    def evaluate(self, img_batch, exp_batch, batch_size, n_classes):
         r"""Efficiently evaluate big batch of images.
 
         Args:
@@ -132,7 +130,7 @@ class CausalMetric:
         """
         n_samples = img_batch.shape[0]
         predictions = torch.FloatTensor(n_samples, n_classes)
-        # assert n_samples % batch_size == 0
+        assert n_samples % batch_size == 0
         for i in tqdm(range(n_samples // batch_size), desc="Predicting labels"):
             preds = self.model(
                 img_batch[i * batch_size : (i + 1) * batch_size].cuda()

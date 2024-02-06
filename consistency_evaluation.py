@@ -6,15 +6,15 @@ import os
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.backends.cudnn as cudnn
+import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from datasets.imagefolder_cgc_ssl import ImageFolder as CGCImageFolder
 from cam import GradCAM
-from eval.utils import *
+from datasets.imagefolder_cgc_ssl import ImageFolder as CGCImageFolder
 from models.image_model import ImageClassificationModel
 from training_utils import DATASETS_TO_CLASSES
 
@@ -53,10 +53,11 @@ def main():
     else:
         if not args.ckpt_path:
             raise Exception("Pretrained is set to False, but no checkpoint path found")
-        if 'cgc' in args.ckpt_path:
+        if "cgc" in args.ckpt_path:
             print(f"Using model checkpoint: {args.ckpt_path}")
 
             import models.resnet_multigpu_cgc as resnet
+
             net = resnet.resnet18()
             net.fc = nn.Linear(512, n_classes)
             state_dict = torch.load(args.ckpt_path)["state_dict"]
@@ -78,7 +79,9 @@ def main():
             )
             # Remove image_model prefix from loaded model. It is probably generated based on the
             # module folder name.
-            state_dict = {k.replace("image_model.", ""): v for k, v in state_dict.items()}
+            state_dict = {
+                k.replace("image_model.", ""): v for k, v in state_dict.items()
+            }
             # Remove LICO parameters. Those were supposed to be thrown away after the training.
             filer = (
                 "learnable_prompts",
@@ -86,7 +89,9 @@ def main():
                 "projection",
                 "criterion.mm_loss.temperature",
             )
-            state_dict = {k: v for k, v in state_dict.items() if not k.startswith(filer)}
+            state_dict = {
+                k: v for k, v in state_dict.items() if not k.startswith(filer)
+            }
             net.load_state_dict(state_dict)
             # Using the last layer of the 4th block
             target_layer = net._model.layer4[-1]
@@ -99,7 +104,6 @@ def main():
 
     os.makedirs(run_dir, exist_ok=True)
 
-    
     cam = GradCAM(model=net, target_layer=target_layer, use_cuda=True)
 
     consis_cosim = get_consistency_per_data_subset(
@@ -116,9 +120,7 @@ def main():
     print("Final:\n Consistency - {:.5f}".format(consis_cosim))
 
 
-def get_consistency_per_data_subset(
-    net, cam, save_dir, device, dataset
-):
+def get_consistency_per_data_subset(net, cam, save_dir, device, dataset):
     batch_size = 50
 
     viz = True
@@ -153,7 +155,7 @@ def get_consistency_per_data_subset(
             hor_flip,
             targets,
         ) = [samp.to(device) for samp in data_loader_sample]
-        
+
         b_size_real = images.shape[0]
 
         # Get saliency maps for images and augmented images
@@ -195,7 +197,7 @@ def get_consistency_per_data_subset(
 
         sim = F.cosine_similarity(img_gcam_maps_aug_batch, aug_img_gcam_maps_batch)
         similarities.append(sim.mean().item())
-    
+
     return torch.tensor(similarities).mean().item()
 
 

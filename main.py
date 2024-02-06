@@ -31,9 +31,13 @@ parser.add_argument('--training-method', type=str, default='baseline',
                     choices=['baseline', 'LICO'])
 parser.add_argument('--alpha', type=float, default=10., help='alpha for LICO loss')
 parser.add_argument('--beta', type=float, default=1., help='beta for LICO loss')
+
 parser.add_argument('--context_tokens', type=int, default=12, help='number of learnable text tokens')
 parser.add_argument('--learnable_context', type=bool, default=True, help='whether to train params of context tokens')
+parser.add_argument('--enable_cls_prompts', default=False, action=argparse.BooleanOptionalAction, help='enable trainable prompts per class')
 parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
+parser.add_argument('--context_position', type=str, default='end', help='part of the prompts where the context tokens should be inserted')
+
 parser.add_argument('--data', metavar='DIR', default='data',
                     help='path to dataset')
 parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
@@ -42,6 +46,7 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
+
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=40, type=int, metavar='N',
@@ -98,20 +103,19 @@ def main():
 
     args = parser.parse_args()
 
-    # args.seed = 42
+    # args.seed = 1
     # args.training_method = 'LICO'
-    # args.alpha = 10.0
-    # args.beta = 1.0
-    # args.context_tokens = 12
-    # args.learnable_context = True
-    # args.dynamic_context = True
-    # args.train_mm_temp = True
-    # args.epochs = 2
-
+    # args.epochs = 10
+    # args.batch_size = 64
+    # args.enable_cls_prompts = False
+    #
+    # # args.data = 'C:/Users/Mikhail/Datasets/ImagenetS/ImageNetS50'
+    # # args.dataset = 'imagenet-s50'
     # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
     # args.dataset = 'imagenet'
     # args.workers = 8
-    # args.arch = 'resnet50'
+    # args.arch = 'resnet18'
+    # args.pretrained = True
 
     # args.resume = 'checkpoint/LICO-cifar100-resnet18-seed_42epoch=1-train_loss=4.00-val_loss=3.81-val_acc1=0.15.ckpt'
     # args.evaluate = True
@@ -155,7 +159,7 @@ def create_dataloaders(args):
                                          std=[0.229, 0.224, 0.225])
         # print('batch size overwritten to 128')
         # args.batch_size = 128
-        testdir = os.path.join(args.data, 'test')
+        testdir = os.path.join(args.data, 'val')
 
     elif args.dataset == 'imagenet-s50':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -230,7 +234,8 @@ def make_model(args, total_steps):
             model = LICOModel(image_model, target_names=target_names,
                               alpha=args.alpha, beta=args.beta, context_tokens=args.context_tokens,
                               learnable_context=args.learnable_context, dynamic_context=args.dynamic_context,
-                              train_mm_temp=args.train_mm_temp)
+                              train_mm_temp=args.train_mm_temp, enable_cls_prompts=args.enable_cls_prompts, num_classes=num_classes,
+                              context_position=args.context_position)
     else:
         raise NotImplementedError
     return model
