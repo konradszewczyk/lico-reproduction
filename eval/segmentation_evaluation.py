@@ -26,36 +26,6 @@ from torchcam.utils import overlay_mask
 from datasets.imagefolder_cgc_ssl import ImageFolder as CGCImageFolder
 import argparse
 
-parser = argparse.ArgumentParser(description="PyTorch Equivariance Evaluation")
-
-parser.add_argument(
-    "--cam", dest="cam", default='grad-cam', type=str, help="explainability method to use"
-)
-parser.add_argument(
-    "--pretrained", dest="pretrained", action="store_true", help="use pre-trained model"
-)
-parser.add_argument(
-    "--ckpt-path", dest="ckpt_path", type=str, help="path to checkpoint file"
-)
-parser.add_argument(
-    "--arch", dest="arch", default='resnet18', type=str, help="model architecture"
-)
-parser.add_argument(
-    "--training-method", dest="training_method", default="baseline", type=str, help="training scheme"
-)
-parser.add_argument(
-    "--dataset", dest="dataset", default='imagenet-s50', type=str, help="dataset to evaluate on"
-)
-parser.add_argument(
-    "--img-data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
-)
-parser.add_argument(
-    "--seg-data", dest="seg_data", default='data/ImageNetS50/validation-segmentation', type=str, help="path to segmentation"
-)
-parser.add_argument(
-    "--save-output", dest="save_output", default=None, type=str, help="folder where to save the output DataFrame"
-)
-
 
 class ImageFolderWithSegmentation(datasets.ImageFolder):
 
@@ -79,8 +49,7 @@ class ImageFolderWithSegmentation(datasets.ImageFolder):
         return (img, label, seg)
 
 
-def main():
-    args = parser.parse_args()
+def segmentation_content_heatmap(args):
 
     cudnn.benchmark = True
     #args.pretrained = True
@@ -178,4 +147,37 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="PyTorch Equivariance Evaluation")
+
+    parser.add_argument(
+        "--cam", dest="cam", default='grad-cam', type=str, help="explainability method to use"
+    )
+    parser.add_argument(
+        "--pretrained", dest="pretrained", action="store_true", help="use pre-trained model"
+    )
+    parser.add_argument(
+        "--ckpt-path", dest="ckpt_path", type=str, help="path to checkpoint file"
+    )
+    parser.add_argument(
+        "--arch", dest="arch", default='resnet18', type=str, help="model architecture"
+    )
+    parser.add_argument(
+        "--training-method", dest="training_method", default="baseline", type=str, help="training scheme"
+    )
+    parser.add_argument(
+        "--dataset", dest="dataset", default='imagenet-s50', type=str, help="dataset to evaluate on"
+    )
+    parser.add_argument(
+        "--img-data", dest="img_data", default='data/ImageNetS50/val', type=str, help="path to images"
+    )
+    parser.add_argument(
+        "--seg-data", dest="seg_data", default='data/ImageNetS50/validation-segmentation', type=str,
+        help="path to segmentation"
+    )
+    parser.add_argument(
+        "--save-output", dest="save_output", default=None, type=str, help="folder where to save the output DataFrame"
+    )
+
+    args = parser.parse_args()
+
+    segmentation_content_heatmap(args)
