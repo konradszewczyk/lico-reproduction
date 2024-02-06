@@ -220,8 +220,7 @@ class ResNet(nn.Module):
         :return:
         """
         # we keep both flags to maintain backward compatibility with previous code
-        # if vanilla:
-        if True:
+        if vanilla:
             return self.forward_vanilla(images)
         if vanilla_with_feats:
             return self.forward_vanilla(images, return_feats=True)
