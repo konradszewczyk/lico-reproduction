@@ -36,9 +36,11 @@ where:
 
 ### Evaluation
 
-The evaluation code is currently available in the "segment_pointing" branch on this repository. It consists of 
+The evaluation code is currently available "eval" folder on this repository. It consists of 
 three runnable files in the "eval" folder: consistency_evaluation.py (Salience Equaivariance Score), 
 segmentation_evaluation.py (Segmentation Content Heatmap) and multi_instance_evaluation.py (Multi-Object Saliency Uniformity).
+
+Additionally, the Jupyter Notebook for interpretability experiments in available under "interpretability_evaluation.ipynb".
 
 #### Salience Equivariance Score
 

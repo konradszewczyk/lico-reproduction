@@ -11,7 +11,7 @@ import torchvision.models as models
 import torch.nn.functional as F
 from utils import *
 from evaluation import CausalMetric, auc, gkern
-from cam.grad_cam import GradCAM
+from eval.cam.grad_cam import GradCAM
 from download_datasets import download_and_prepare_cifar100
 from models.image_model import ImageClassificationModel
 from training_utils import get_logger, DATASETS_TO_CLASSES

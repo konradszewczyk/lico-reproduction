@@ -13,7 +13,7 @@ import torchvision.models as models
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from cam import GradCAM
+from eval.cam import GradCAM
 from datasets.imagefolder_cgc_ssl import ImageFolder as CGCImageFolder
 from models.image_model import ImageClassificationModel
 from training_utils import DATASETS_TO_CLASSES

@@ -1,5 +1,5 @@
-from cam.base_cam import BaseCAM
-from cam.utils.svd_on_activations import get_2d_projection
+from .base_cam import BaseCAM
+from .utils.svd_on_activations import get_2d_projection
 
 
 # https://arxiv.org/abs/2008.00299
