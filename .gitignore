@@ -6,3 +6,8 @@ logs/
 lightning_logs/
 checkpoints/
 checkpoint/
+cgc-log/
+cgc-save/
+wandb/
+*.png
+*.json

@@ -202,7 +202,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, images, contrastive_criterion, xe_images=None, aug_images=None, aug_params_dict=None, targets=None, 
+    def forward(self, images, contrastive_criterion=None, xe_images=None, aug_images=None, aug_params_dict=None, targets=None, 
                  xent_criterion=None, vanilla=False, vanilla_with_feats=False, disable_contrast=False):
         """
         This function serves as the wrapper which computes both losses and returns the loss values
