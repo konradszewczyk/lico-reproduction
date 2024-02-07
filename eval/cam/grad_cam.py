@@ -1,5 +1,6 @@
 import numpy as np
-from cam.base_cam import BaseCAM
+
+from .base_cam import BaseCAM
 
 
 class GradCAM(BaseCAM):

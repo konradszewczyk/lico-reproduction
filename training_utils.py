@@ -52,6 +52,7 @@ DATASETS_TO_CLASSES = {
     'cifar100': 100,
     'imagenet': 1000,
     'imagenet-s50': 50,
+    'ImageNetS50': 50,
     'cub': 200,
     'aircraft': 100,
     'flowers': 102,

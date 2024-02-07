@@ -2,8 +2,9 @@ import cv2
 import numpy as np
 import torch
 import ttach as tta
-from cam.activations_and_gradients import ActivationsAndGradients
-from cam.utils.svd_on_activations import get_2d_projection
+
+from .activations_and_gradients import ActivationsAndGradients
+from .utils.svd_on_activations import get_2d_projection
 
 
 class BaseCAM:

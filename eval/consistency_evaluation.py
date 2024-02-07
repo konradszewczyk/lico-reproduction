@@ -13,33 +13,13 @@ import torchvision.models as models
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from cam import GradCAM
+from eval.cam import GradCAM
 from datasets.imagefolder_cgc_ssl import ImageFolder as CGCImageFolder
 from models.image_model import ImageClassificationModel
 from training_utils import DATASETS_TO_CLASSES
 
-parser = argparse.ArgumentParser(description="PyTorch Equivariance Evaluation")
-parser.add_argument(
-    "--pretrained", dest="pretrained", action="store_true", help="use pre-trained model"
-)
-parser.add_argument(
-    "--ckpt-path", dest="ckpt_path", type=str, help="path to checkpoint file"
-)
-parser.add_argument(
-    "--dataset", dest="dataset", type=str, help="dataset name", default="cifar100"
-)
-parser.add_argument(
-    "--save-dir",
-    dest="save_dir",
-    type=str,
-    help="path to save dir",
-    default="pretrained",
-)
 
-
-def main():
-    args = parser.parse_args()
-
+def salience_equivariance_score(args):
     cudnn.benchmark = True
     n_classes = DATASETS_TO_CLASSES[args.dataset]
 
@@ -270,4 +250,24 @@ def apply_transforms_to_heatmaps(heatmaps, aug_params_dict, device):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="PyTorch Equivariance Evaluation")
+    parser.add_argument(
+        "--pretrained", dest="pretrained", action="store_true", help="use pre-trained model"
+    )
+    parser.add_argument(
+        "--ckpt-path", dest="ckpt_path", type=str, help="path to checkpoint file"
+    )
+    parser.add_argument(
+        "--dataset", dest="dataset", type=str, help="dataset name", default="cifar100"
+    )
+    parser.add_argument(
+        "--save-dir",
+        dest="save_dir",
+        type=str,
+        help="path to save dir",
+        default="pretrained",
+    )
+
+    args = parser.parse_args()
+
+    salience_equivariance_score(args)
