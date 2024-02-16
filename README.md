@@ -1,6 +1,5 @@
 ## Reproduction of "Language-Image COnsistency"
-**Authors:** Patrik Bartak*, Fanmin Shi*, Konrad Szewczyk*, Mikhail Vlasenko*  
-Equal contribution is denoted using *
+**Authors:** #################
 
 This repository contains the codebase used in our reproduction study of "Language-Image COnsistency" 
 by Lei et al. (https://arxiv.org/abs/2310.09821).
