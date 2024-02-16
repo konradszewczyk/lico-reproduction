@@ -103,23 +103,6 @@ def main():
 
     args = parser.parse_args()
 
-    # args.seed = 1
-    # args.training_method = 'LICO'
-    # args.epochs = 10
-    # args.batch_size = 64
-    # args.enable_cls_prompts = False
-    #
-    # # args.data = 'C:/Users/Mikhail/Datasets/ImagenetS/ImageNetS50'
-    # # args.dataset = 'imagenet-s50'
-    # args.data = 'C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC'
-    # args.dataset = 'imagenet'
-    # args.workers = 8
-    # args.arch = 'resnet18'
-    # args.pretrained = True
-
-    # args.resume = 'checkpoint/LICO-cifar100-resnet18-seed_42epoch=1-train_loss=4.00-val_loss=3.81-val_acc1=0.15.ckpt'
-    # args.evaluate = True
-
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
     logger = get_logger(logpath=os.path.join(args.log_dir, 'logs'), filepath=os.path.abspath(__file__))
