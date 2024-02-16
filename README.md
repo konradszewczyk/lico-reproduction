@@ -70,7 +70,7 @@ in the input image.
 
 The evaluation on SES can by run by:
 ```bash
-python eval\consistency_evaluation.py 
+python -m eval.consistency_evaluation 
   --pretrained (optional)
   --ckpt-path $ckpt_path
   --dataset $dataset 
@@ -94,7 +94,7 @@ makes decisions majorly based on the features lying within desired objects and n
 The evaluation on SCH can be run as:
 
 ```bash
-python eval\segmentation_evaluation.py 
+python -m eval.segmentation_evaluation
   --pretrained (optional)
   --ckpt-path $ckpt_path
   --arch $arch
@@ -126,7 +126,7 @@ that the attribution given to the instances is more proportional to the size of 
 The evaluation on MOSU can be run as:
 
 ```bash
-python eval\multi_instance_evaluation.py 
+python -m eval.multi_instance_evaluation
   --pretrained (optional)
   --ckpt-path $ckpt_path
   --arch $arch
