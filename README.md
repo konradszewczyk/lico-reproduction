@@ -38,7 +38,6 @@ where:
 - ```$seed``` - seed used for training
 - ```$workers``` - number of data loading workers
 - ```$context_position``` - position of **CLASS LABEL** in the text prompt of LICO method [allowed value: 'front', 'end']
-
 ### Evaluation
 
 The evaluation code is available within the "eval" folder on this repository. It consists of 
@@ -46,6 +45,19 @@ three runnable files: consistency_evaluation.py (Salience Equaivariance Score),
 segmentation_evaluation.py (Segmentation Content Heatmap) and multi_instance_evaluation.py (Multi-Object Saliency Uniformity).
 
 Additionally, the Jupyter Notebook for interpretability experiments in available under "interpretability_evaluation.ipynb".
+
+The dataset used for the full evaluation in our reproducibility paper was ImageNet-S_$_{50}$, which can be downloaded using https://github.com/LUSSeg/ImageNet-S and is expected to include the following folders:
+- validation (renamed to "val") - validation data from ImageNet-S_$_{50}$ in ImageFolder-compliant folder structure
+- validation-segmentation - segmentation masks for validation set
+- annotations/val - folder with bounding box information (not provided by ImageNet-S_$_{50}$, has to be manually downloaded from full ImageNet1k)
+
+We also share the pretrained models from our experiments (all trained with seed=2; the entire .ckpt file must be downloaded):
+- [ResNet18 baseline](https://drive.google.com/file/d/1P_KObRv62aP89aO5KOowGfoZWxcWCwIU/view?usp=sharing)
+- [ResNet18 + LICO](https://drive.google.com/file/d/1YZ6Pz5q_jxjZZRPEieE2E1ztvwVmw_A-/view?usp=sharing)
+- [ResNet18 + only MM loss](https://drive.google.com/file/d/13sfg0UmNACs1nTpZBGGCFKOWjqiYgQAJ/view?usp=sharing)
+- [ResNet18 + only OT loss](https://drive.google.com/file/d/1kDoHlVheA6_ornMGKWWjzghQ8VXCxUvR/view?usp=sharing)
+- [ResNet18 + LICO with class tokens at the front of the prompt](https://drive.google.com/file/d/1EsIXKIG6MmA5x_vLU8sHtG1r52DSY4gG/view?usp=sharing)
+- [ResNet18 + LICO with trainable context tokens separate between classes](https://drive.google.com/file/d/1m6L3XGGvbFsZdqbBR8ygYBJr-V_0LIGQ/view?usp=sharing)
 
 #### Salience Equivariance Score
 
