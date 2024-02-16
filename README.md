@@ -52,12 +52,12 @@ The dataset used for the full evaluation in our reproducibility paper was ImageN
 - annotations/val - folder with bounding box information (not provided by ImageNet-S_$_{50}$, has to be manually downloaded from full ImageNet1k)
 
 We also share the pretrained models from our experiments (all trained with seed=2; the entire .ckpt file must be downloaded):
-- [ResNet18 baseline](https://drive.google.com/file/d/1P_KObRv62aP89aO5KOowGfoZWxcWCwIU/view?usp=sharing)
-- [ResNet18 + LICO](https://drive.google.com/file/d/1YZ6Pz5q_jxjZZRPEieE2E1ztvwVmw_A-/view?usp=sharing)
-- [ResNet18 + only MM loss](https://drive.google.com/file/d/13sfg0UmNACs1nTpZBGGCFKOWjqiYgQAJ/view?usp=sharing)
-- [ResNet18 + only OT loss](https://drive.google.com/file/d/1kDoHlVheA6_ornMGKWWjzghQ8VXCxUvR/view?usp=sharing)
-- [ResNet18 + LICO with class tokens at the front of the prompt](https://drive.google.com/file/d/1EsIXKIG6MmA5x_vLU8sHtG1r52DSY4gG/view?usp=sharing)
-- [ResNet18 + LICO with trainable context tokens separate between classes](https://drive.google.com/file/d/1m6L3XGGvbFsZdqbBR8ygYBJr-V_0LIGQ/view?usp=sharing)
+- [ResNet18 baseline](https://drive.google.com/file/d/1UhT2BxxjZipG5FJJ4A5-GN1o_7v6CQ8R/view?usp=sharing)
+- [ResNet18 + LICO](https://drive.google.com/file/d/1a3RUseiCLeZQgf9U5QJ8jK5iW3VK7Bl6/view?usp=sharing)
+- [ResNet18 + only MM loss](https://drive.google.com/file/d/1CID-NWYyM6vse3iy4E32kYILxD7MBdxm/view?usp=sharing)
+- [ResNet18 + only OT loss](https://drive.google.com/file/d/1zIFnZEQHAuY8CUOZHulOmr_gIpmFW85N/view?usp=sharing)
+- [ResNet18 + LICO with class tokens at the front of the prompt](https://drive.google.com/file/d/1LSDx8-QVazENV7P8hfQlJDeX9H9AeA0L/view?usp=sharing)
+- [ResNet18 + LICO with trainable context tokens separate between classes](https://drive.google.com/file/d/1l76iUfXKp2y4OCsemjUIbN7nA6Pg12sw/view?usp=sharing)
 
 #### Salience Equivariance Score
 
