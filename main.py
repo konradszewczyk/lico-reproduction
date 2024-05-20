@@ -243,6 +243,9 @@ def train(args):
     model = make_model(args, total_steps)
 
     checkpoint_callback = ModelCheckpoint(
+        monitor='epoch',
+        mode='max',
+        save_top_k=2,
         dirpath=args.save_dir,
         filename=f'{args.training_method}-{args.dataset}-{args.arch}-'
                  f'{("seed_" + str(args.seed) + "-") if args.seed else ""}' +
