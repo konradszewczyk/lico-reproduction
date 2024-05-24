@@ -4,7 +4,7 @@
 #SBATCH --job-name=unzip-imagenet
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=128
-#SBATCH --time=1:00:00
+#SBATCH --time=3:00:00
 #SBATCH --output=output/unzip-imagenet_%A.out
 
 module purge
@@ -20,4 +20,4 @@ source activate fact2024
 nproc
 
 # unzip imagenet
-7za x imagenet-object-localization-challenge.zip -mmt=$(nproc)
+7za x imagenet-object-localization-challenge.zip -y -mmt=$(nproc)
