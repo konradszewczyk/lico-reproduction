@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu
+#SBATCH --gpus=4
+#SBATCH --job-name=LICO_training_imagenet
+#SBATCH --ntasks=1
+#SBATCH --time=72:00:00
+#SBATCH --output=output/LICO_training_imagenet_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+
+# activate the environment
+source activate fact2024
+
+#Run something like this:
+#main.py --seed 1 --arch resnet50 --epochs 100 --batch-size 8
+#--data C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC
+#--dataset imagenet --lr 0.03 --training-method LICO --workers 2 --context_position end
+
+# Run this as
+# sbatch train_model_imagenet.job LICO resnet18 1 4 <WANDB_API_KEY>
+
+# Positional args
+training_method=$1 # LICO or ...
+arch=$2 # resnet18 or resnet50
+seed=$3
+num_devices=$4
+WANDB_API_KEY=$5
+
+export WANDB_API_KEY=$WANDB_API_KEY
+
+# Run 1: Visual prompting CLIP on CIFAR-10 with standard text prompt
+code_dir="$HOME/uva_fact_2024"
+
+# Standard constants
+dataset="imagenet"
+data="$code_dir/data/ImageNet"
+epochs=100
+batch_size=128
+workers=8
+lr=0.03
+
+alpha=10.0
+beta=1.0
+
+context_position="end"
+
+## Copy the data to the scratch-local
+root=/scratch-local/$USER
+mkdir -p $root
+cp -r $data "$root/data"
+
+echo "Running experiment on $dataset with $training_method $method and batch size $batch_size and seed $seed"
+python $code_dir/main.py \
+    --dataset $dataset \
+    --data "$root/data" \
+    --arch $arch \
+    --epochs $epochs \
+    --training-method $training_method \
+    --alpha $alpha \
+    --beta $beta \
+    --seed $seed \
+    --workers $workers \
+    --lr $lr \
+    --devices "$num_devices" \
+    --context_position $context_position
