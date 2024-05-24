@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#SBATCH --partition=rome
+#SBATCH --job-name=unzip-imagenet
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=128
+#SBATCH --time=1:00:00
+#SBATCH --output=output/unzip-imagenet_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+
+cd $HOME/uva_fact_2024/
+
+# activate the environment
+source activate fact2024
+
+# unzip imagenet
+7za x imagenet-object-localization-challenge.zip -mmt=$(nproc)
