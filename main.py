@@ -83,6 +83,8 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
+parser.add_argument('--devices', default=1, type=int,
+                    help='number of gpus')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
@@ -98,8 +100,8 @@ parser.add_argument('--dataset', type=str, default='cifar100',
 
 
 def main():
-    # fp16 precision for speed
-    torch.set_float32_matmul_precision('medium')
+    # # fp16 precision for speed
+    # torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
 
@@ -241,6 +243,9 @@ def train(args):
     model = make_model(args, total_steps)
 
     checkpoint_callback = ModelCheckpoint(
+        monitor='epoch',
+        mode='max',
+        save_top_k=2,
         dirpath=args.save_dir,
         filename=f'{args.training_method}-{args.dataset}-{args.arch}-'
                  f'{("seed_" + str(args.seed) + "-") if args.seed else ""}' +
@@ -255,6 +260,9 @@ def train(args):
         enable_progress_bar=True,
         logger=WandbLogger(project="lico-reproduction", config=args, log_model=True),
         gradient_clip_val=0.5,
+        accelerator="gpu",
+        devices=args.devices,
+        strategy="ddp",
     )
 
     trainer.fit(model, train_loader, val_loader)
