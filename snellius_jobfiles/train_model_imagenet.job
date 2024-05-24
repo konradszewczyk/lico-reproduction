@@ -36,7 +36,7 @@ code_dir="$HOME/uva_fact_2024"
 
 # Standard constants
 dataset="imagenet"
-data="$code_dir/data/ImageNet"
+data="$code_dir/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC"
 epochs=100
 batch_size=128
 workers=8
