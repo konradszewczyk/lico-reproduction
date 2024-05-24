@@ -5,8 +5,8 @@
 #SBATCH --job-name=MakeEnv
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --time=04:00:00
-#SBATCH --output=output/slurm_output_%A.out
+#SBATCH --time=00:30:00
+#SBATCH --output=output/MakeEnv_%A.out
 
 module purge
 module load 2022
