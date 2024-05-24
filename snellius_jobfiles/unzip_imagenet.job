@@ -20,4 +20,4 @@ source activate fact2024
 nproc
 
 # unzip imagenet
-7za x imagenet-object-localization-challenge.zip -mmt=$(nproc)
+pv imagenet-object-localization-challenge.zip | 7za x -siy -mmt=$(nproc)
