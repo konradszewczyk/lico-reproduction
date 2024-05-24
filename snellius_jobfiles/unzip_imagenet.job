@@ -16,5 +16,8 @@ cd $HOME/uva_fact_2024/
 # activate the environment
 source activate fact2024
 
+# print number of cores
+nproc
+
 # unzip imagenet
 7za x imagenet-object-localization-challenge.zip -mmt=$(nproc)
