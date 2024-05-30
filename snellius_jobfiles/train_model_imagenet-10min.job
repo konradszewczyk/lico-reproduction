@@ -2,10 +2,10 @@
 
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --job-name=LICO_training_imagenet-10min
+#SBATCH --job-name=LICO_training_imagenet_10min
 #SBATCH --ntasks=1
-#SBATCH --time=0:30:00
-#SBATCH --output=output/LICO_training_imagenet-10min_%A.out
+#SBATCH --time=0:10:00
+#SBATCH --output=output/LICO_training_imagenet_10min_%A.out
 
 module purge
 module load 2022
@@ -48,16 +48,16 @@ beta=1.0
 
 context_position="end"
 
-## Copy the data to the scratch-local
-echo "Copying dataset to scratch local"
-root=/scratch-local/$USER
-mkdir -p $root
-rsync --info=progress2 -r $data "$root/data"
+### Copy the data to the scratch-local
+#root=/scratch-local/$USER
+#mkdir -p $root
+#echo "Copying dataset from $data to $root/data"
+#rsync --info=progress2 -r $data "$root/data"
 
 echo "Running experiment on $dataset with $training_method $method and batch size $batch_size and seed $seed"
 python $code_dir/main.py \
     --dataset $dataset \
-    --data "$root/data" \
+    --data $data \
     --arch $arch \
     --epochs $epochs \
     --training-method $training_method \
