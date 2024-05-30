@@ -49,6 +49,7 @@ beta=1.0
 context_position="end"
 
 ## Copy the data to the scratch-local
+echo "Copying dataset to scratch local"
 root=/scratch-local/$USER
 mkdir -p $root
 rsync --info=progress2 -r $data "$root/data"
