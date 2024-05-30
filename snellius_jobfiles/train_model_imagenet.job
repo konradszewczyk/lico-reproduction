@@ -51,7 +51,7 @@ context_position="end"
 ## Copy the data to the scratch-local
 root=/scratch-local/$USER
 mkdir -p $root
-cp -r $data "$root/data"
+rsync --info=progress2 -r $data "$root/data"
 
 echo "Running experiment on $dataset with $training_method $method and batch size $batch_size and seed $seed"
 python $code_dir/main.py \
