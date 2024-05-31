@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu_mig
 #SBATCH --gpus=1
-#SBATCH --job-name=LICO_training_imagenet_10min
+#SBATCH --job-name=LICO_training_imagenet_40min
 #SBATCH --ntasks=1
-#SBATCH --time=0:10:00
-#SBATCH --output=output/LICO_training_imagenet_10min_%A.out
+#SBATCH --time=0:40:00
+#SBATCH --output=output/LICO_training_imagenet_40min_%A.out
 
 module purge
 module load 2022
@@ -48,12 +48,28 @@ beta=1.0
 
 context_position="end"
 
-### Copy the data to the scratch-local
-#root=/scratch-local/$USER
-#mkdir -p $root
-#echo "Copying dataset from $data to $root/data"
-#rsync --info=progress2 -r $data "$root/data"
+## Copy the data to the scratch-shared
+root=/scratch-shared/$USER
+data_source="$data"
+data_dest="$root/data"
 
+# Create the destination directory if it doesn't exist
+mkdir -p "$root"
+
+# Check if the destination directory exists and is not empty
+if [ -d "$data_dest" ] && [ "$(ls -A $data_dest)" ]; then
+    echo "Data already exists at $data_dest. Skipping copy."
+else
+    echo "Copying dataset from $data_source to $data_dest"
+    rsync --info=progress2 -r "$data_source/" "$data_dest"
+
+    # Fix structure of val set
+    echo "Fixing val set dir structure"
+    cd "$root/data/val" || exit
+    wget -qO- https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh | bash
+fi
+
+# Run the experiment
 echo "Running experiment on $dataset with $training_method and batch size $batch_size and seed $seed"
 python $code_dir/main.py \
     --dataset $dataset \

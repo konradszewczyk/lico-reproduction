@@ -63,12 +63,12 @@ if [ -d "$data_dest" ] && [ "$(ls -A $data_dest)" ]; then
 else
     echo "Copying dataset from $data_source to $data_dest"
     rsync --info=progress2 -r "$data_source/" "$data_dest"
-fi
 
-# Fix structure of val set
-echo "Fixing val set dir structure"
-cd "$root/data/val" || exit
-wget -qO- https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh | bash
+    # Fix structure of val set
+    echo "Fixing val set dir structure"
+    cd "$root/data/val" || exit
+    wget -qO- https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh | bash
+fi
 
 # Run the experiment
 echo "Running experiment on $dataset with $training_method and batch size $batch_size and seed $seed"
