@@ -54,7 +54,7 @@ context_position="end"
 #echo "Copying dataset from $data to $root/data"
 #rsync --info=progress2 -r $data "$root/data"
 
-echo "Running experiment on $dataset with $training_method $method and batch size $batch_size and seed $seed"
+echo "Running experiment on $dataset with $training_method and batch size $batch_size and seed $seed"
 python $code_dir/main.py \
     --dataset $dataset \
     --data $data \
