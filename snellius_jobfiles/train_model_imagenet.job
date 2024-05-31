@@ -4,7 +4,7 @@
 #SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet
 #SBATCH --ntasks=1
-#SBATCH --time=72:00:00
+#SBATCH --time=30:00:00
 #SBATCH --output=output/LICO_training_imagenet_%A.out
 
 module purge
@@ -23,7 +23,7 @@ source activate fact2024
 # sbatch train_model_imagenet.job LICO resnet18 1 4 <WANDB_API_KEY>
 
 # Positional args
-training_method=$1 # LICO or ...
+training_method=$1 # LICO or baseline
 arch=$2 # resnet18 or resnet50
 seed=$3
 num_devices=$4
