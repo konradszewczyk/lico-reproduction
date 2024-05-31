@@ -51,9 +51,7 @@ context_position="end"
 
 ## Copy the val data to the scratch-node (very fast brr)
 train_root="$data"
-val_root="/$TMP_DIR"
-
-echo "Using TMP_DIR $TMP_DIR"
+val_root="/scratch-shared/$USER"
 
 data_dest=$val_root
 
