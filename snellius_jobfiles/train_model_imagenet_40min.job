@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --partition=gpu
-#SBATCH --gpus=1
+#SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet_40min
 #SBATCH --ntasks=1
 #SBATCH --time=0:40:00
