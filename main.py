@@ -234,7 +234,7 @@ def make_model(args, total_steps):
 
 def train(args):
     print(f"Starting training with the following configuration:\n"
-          f" - Dataset: {args.dataset} (Path: {args.train_dir and args.val_dir})\n"
+          f" - Dataset: {args.dataset} (Path: {args.train_dir} and {args.val_dir})\n"
           f" - Architecture: {args.arch}\n"
           f" - Training Method: {args.training_method}\n"
           f" - Seed: {args.seed}\n"
