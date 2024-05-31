@@ -136,28 +136,28 @@ def create_dataloaders(args):
     traindir = args.train_dir
     valdir = args.val_dir
     if args.dataset == 'cifar100':
-        if not os.path.exists(os.path.join(args.data, 'train')):
+        if not os.path.exists(traindir):
             from download_datasets import download_and_prepare_cifar100
             download_and_prepare_cifar100(args.data)
         normalize = transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
         # print('batch size overwritten to 64')
         # args.batch_size = 64
         # cifar100 has only 2 sets of data
-        testdir = os.path.join(args.data, 'val')
+        testdir = valdir
 
     elif args.dataset == 'imagenet':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         # print('batch size overwritten to 128')
         # args.batch_size = 128
-        testdir = os.path.join(args.data, 'val')
+        testdir = valdir
 
     elif args.dataset == 'imagenet-s50':
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         # print('batch size set to 128')
         # args.batch_size = 128
-        testdir = os.path.join(args.data, 'val')
+        testdir = valdir
 
     else:
         raise NotImplementedError
@@ -234,7 +234,7 @@ def make_model(args, total_steps):
 
 def train(args):
     print(f"Starting training with the following configuration:\n"
-          f" - Dataset: {args.dataset} (Path: {args.data})\n"
+          f" - Dataset: {args.dataset} (Path: {args.train_dir and args.val_dir})\n"
           f" - Architecture: {args.arch}\n"
           f" - Training Method: {args.training_method}\n"
           f" - Seed: {args.seed}\n"
