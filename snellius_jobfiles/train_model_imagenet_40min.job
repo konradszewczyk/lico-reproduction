@@ -73,6 +73,7 @@ fi
 
 # Run the experiment
 echo "Running experiment on $dataset with $training_method and batch size $batch_size and seed $seed"
+cd "$code_dir" || exit
 python $code_dir/main.py \
     --dataset $dataset \
     --train_dir "$train_root/train" \
