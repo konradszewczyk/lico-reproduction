@@ -1,26 +1,24 @@
 import argparse
 import os
-import random
 import warnings
 
+import pytorch_lightning as pl
 import torch
-import torch.nn.parallel
 import torch.backends.cudnn as cudnn
+import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
-
-import pytorch_lightning as pl
+import torchvision.transforms as transforms
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 
 from models.LICO_model import LICOModel, tokenize_targets
 from models.image_model import ImageClassificationModel
 from training_utils import get_logger, DATASETS_TO_CLASSES, TEXT_CLASSES
-
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -262,7 +260,7 @@ def train(args):
         gradient_clip_val=0.5,
         accelerator="gpu",
         devices=args.devices,
-        strategy="ddp",
+        strategy=DDPStrategy(find_unused_parameters=True),
     )
 
     trainer.fit(model, train_loader, val_loader)

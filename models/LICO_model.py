@@ -11,18 +11,18 @@ from training_utils import accuracy
 
 class LICOModel(pl.LightningModule):
     def __init__(
-        self,
-        image_model,
-        target_names: torch.tensor,
-        alpha: float,
-        beta: float,
-        context_tokens: int,
-        learnable_context: bool,
-        dynamic_context: bool,
-        train_mm_temp: bool,
-        num_classes: int = 1,
-        enable_cls_prompts : bool = False,
-        context_position: str = 'end'
+            self,
+            image_model,
+            target_names: torch.tensor,
+            alpha: float,
+            beta: float,
+            context_tokens: int,
+            learnable_context: bool,
+            dynamic_context: bool,
+            train_mm_temp: bool,
+            num_classes: int = 1,
+            enable_cls_prompts: bool = False,
+            context_position: str = 'end'
     ):
         """
         :param image_model: the image model to use for feature extraction nad classification
@@ -55,7 +55,7 @@ class LICOModel(pl.LightningModule):
         self.context_position = context_position
 
         self.output_tokens = (
-            torch.count_nonzero(target_names, dim=(1, 2)).max() + self.context_tokens
+                torch.count_nonzero(target_names, dim=(1, 2)).max() + self.context_tokens
         )
 
         n_classes = 1
@@ -98,7 +98,7 @@ class LICOModel(pl.LightningModule):
         if self.context_position == "end":
             prefix_length = 1
             label_length = (
-                self.text_model.positional_embedding.shape[0] - self.context_tokens
+                    self.text_model.positional_embedding.shape[0] - self.context_tokens
             )
             label_prefix = label_features[:, :prefix_length, :]
             label_suffix = label_features[:, prefix_length:label_length, :]
@@ -130,7 +130,6 @@ class LICOModel(pl.LightningModule):
 
         return text_features[:, 1: self.output_tokens, :] @ self.text_model.text_projection
 
-
     def training_step(self, batch, batch_idx):
         """
         :param batch: tuple of (images, target)
@@ -147,10 +146,10 @@ class LICOModel(pl.LightningModule):
             img_logits, target, img_features, projected_text_features
         )
 
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train_mm_part", mm_part)
-        self.log("train_ot_part", ot_part)
-        self.log("mm_loss_temperature", self.criterion.mm_loss.temperature)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("train_mm_part", mm_part, sync_dist=True)
+        self.log("train_ot_part", ot_part, sync_dist=True)
+        self.log("mm_loss_temperature", self.criterion.mm_loss.temperature, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx, logging_prefix="val"):
@@ -164,13 +163,13 @@ class LICOModel(pl.LightningModule):
             img_logits, target, img_features, projected_text_features
         )
         acc1, acc5 = accuracy(img_logits, target, topk=(1, 5))
-        self.log(f"{logging_prefix}_loss", loss)
-        self.log(f"{logging_prefix}_mm_part", mm_part)
-        self.log(f"{logging_prefix}_ot_part", ot_part)
+        self.log(f"{logging_prefix}_loss", loss, sync_dist=True)
+        self.log(f"{logging_prefix}_mm_part", mm_part, sync_dist=True)
+        self.log(f"{logging_prefix}_ot_part", ot_part, sync_dist=True)
         self.log(
-            f"{logging_prefix}_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True
+            f"{logging_prefix}_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True
         )
-        self.log(f"{logging_prefix}_acc5", acc5)
+        self.log(f"{logging_prefix}_acc5", acc5, sync_dist=True)
         return {
             f"{logging_prefix}_loss": loss,
             f"{logging_prefix}_acc1": acc1,
