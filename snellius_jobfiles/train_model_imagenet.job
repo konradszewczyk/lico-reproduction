@@ -28,6 +28,8 @@ arch=$2 # resnet18 or resnet50
 seed=$3
 num_devices=$4
 WANDB_API_KEY=$5
+alpha=$6
+beta=$7
 
 export WANDB_API_KEY=$WANDB_API_KEY
 
@@ -43,8 +45,10 @@ batch_size=128
 workers=8
 lr=0.03
 
-alpha=10.0
-beta=1.0
+echo "Using alpha $alpha (LICO uses 10.0) and beta $beta (LICO uses 1.0)"
+
+#alpha=10.0
+#beta=1.0
 
 context_position="end"
 
