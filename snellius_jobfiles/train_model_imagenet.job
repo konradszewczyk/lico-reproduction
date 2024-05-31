@@ -1,12 +1,11 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu_mig
 #SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet
 #SBATCH --ntasks=1
 #SBATCH --time=30:00:00
 #SBATCH --output=output/LICO_training_imagenet_%A.out
-#SBATCH --constraint=scratch-node
 
 module purge
 module load 2022
