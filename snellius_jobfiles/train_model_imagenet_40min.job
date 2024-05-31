@@ -23,7 +23,7 @@ source activate fact2024
 # sbatch train_model_imagenet.job LICO resnet18 1 1 <WANDB_API_KEY>
 
 # Positional args
-training_method=$1 # LICO or ...
+training_method=$1 # LICO or baseline
 arch=$2 # resnet18 or resnet50
 seed=$3
 num_devices=$4
