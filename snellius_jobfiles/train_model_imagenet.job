@@ -49,24 +49,25 @@ beta=1.0
 context_position="end"
 
 
-## Copy the data to the scratch-shared
-root=/scratch-shared/$USER
-data_source="$data"
-data_dest="$root/data"
+## Copy the val data to the scratch-node (very fast brr)
+train_root="$data"
+val_root="/scratch-node/$USER"
+
+data_dest=$val_root
 
 # Create the destination directory if it doesn't exist
-mkdir -p "$root"
+mkdir -p "$val_root"
 
 # Check if the destination directory exists and is not empty
 if [ -d "$data_dest" ] && [ "$(ls -A $data_dest)" ]; then
     echo "Data already exists at $data_dest. Skipping copy."
 else
-    echo "Copying dataset from $data_source to $data_dest"
-    rsync --info=progress2 -r "$data_source/" "$data_dest"
+    echo "Copying dataset $data/val to $data_dest"
+    rsync --info=progress2 -r "$data/val" "$data_dest"
 
     # Fix structure of val set
     echo "Fixing val set dir structure"
-    cd "$root/data/val" || exit
+    cd "$data_dest/val" || exit
     wget -qO- https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh | bash
 fi
 
@@ -75,7 +76,8 @@ echo "Running experiment on $dataset with $training_method and batch size $batch
 cd "$code_dir" || exit
 python $code_dir/main.py \
     --dataset $dataset \
-    --data "$root/data" \
+    --train_dir "$train_root/train" \
+    --val_dir "$val_root/val" \
     --arch $arch \
     --epochs $epochs \
     --training-method $training_method \

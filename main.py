@@ -36,8 +36,14 @@ parser.add_argument('--enable_cls_prompts', default=False, action=argparse.Boole
 parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
 parser.add_argument('--context_position', type=str, default='end', help='part of the prompts where the context tokens should be inserted')
 
-parser.add_argument('--data', metavar='DIR', default='data',
-                    help='path to dataset')
+# parser.add_argument('--data', metavar='DIR', default='data',
+#                     help='path to dataset')
+
+parser.add_argument('--train_dir', metavar='DIR', default='data/train',
+                    help='path to train dataset')
+parser.add_argument('--val_dir', metavar='DIR', default='data/val',
+                    help='path to val dataset')
+
 parser.add_argument('--train_mm_temp', type=bool, default=True, help='whether to train the MM temperature parameter')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
@@ -125,8 +131,10 @@ def main():
 
 def create_dataloaders(args):
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
+    # traindir = os.path.join(args.data, 'train')
+    # valdir = os.path.join(args.data, 'val')
+    traindir = args.train_dir
+    valdir = args.val_dir
     if args.dataset == 'cifar100':
         if not os.path.exists(os.path.join(args.data, 'train')):
             from download_datasets import download_and_prepare_cifar100
