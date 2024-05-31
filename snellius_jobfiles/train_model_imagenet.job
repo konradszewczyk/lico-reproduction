@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu_mig
+#SBATCH --partition=gpu
 #SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet
 #SBATCH --ntasks=1
