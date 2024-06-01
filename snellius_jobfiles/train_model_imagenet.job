@@ -41,6 +41,8 @@ dataset="imagenet"
 #data="$code_dir/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
 epochs=90
+# For 128, 4 gpu, around 10 min per epoch
+# For 64, 4 gpu, around 10 min per epoch
 # 128 / <num_GPU>
 batch_size=32
 workers=8
@@ -91,5 +93,6 @@ python $code_dir/main.py \
     --seed $seed \
     --workers $workers \
     --lr $lr \
+    --batch-size $batch_size \
     --devices "$num_devices" \
     --context_position $context_position

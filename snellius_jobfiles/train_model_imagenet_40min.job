@@ -86,5 +86,6 @@ python $code_dir/main.py \
     --seed $seed \
     --workers $workers \
     --lr $lr \
+    --batch-size $batch_size \
     --devices "$num_devices" \
     --context_position $context_position
