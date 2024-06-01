@@ -4,7 +4,7 @@
 #SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet
 #SBATCH --ntasks=1
-#SBATCH --time=30:00:00
+#SBATCH --time=80:00:00
 #SBATCH --output=output/LICO_training_imagenet_%A.out
 
 module purge
@@ -40,8 +40,9 @@ code_dir="$HOME/uva_fact_2024"
 dataset="imagenet"
 #data="$code_dir/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
-epochs=100
-batch_size=128
+epochs=90
+# 128 / <num_GPU>
+batch_size=32
 workers=8
 lr=0.03
 
@@ -53,7 +54,7 @@ echo "Using alpha $alpha (LICO uses 10.0) and beta $beta (LICO uses 1.0)"
 context_position="end"
 
 
-## Copy the val data to the scratch-node (very fast brr)
+## Copy the val data to the scratch-shared
 train_root="$data"
 val_root="/scratch-shared/$USER"
 

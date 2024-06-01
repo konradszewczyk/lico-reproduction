@@ -4,7 +4,7 @@
 #SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet_40min
 #SBATCH --ntasks=1
-#SBATCH --time=0:40:00
+#SBATCH --time=0:10:00
 #SBATCH --output=output/LICO_training_imagenet_40min_%A.out
 
 module purge
@@ -38,8 +38,8 @@ code_dir="$HOME/uva_fact_2024"
 dataset="imagenet"
 #data="$code_dir/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
-epochs=100
-batch_size=128
+epochs=90
+batch_size=32
 workers=8
 lr=0.03
 
