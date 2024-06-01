@@ -4,7 +4,7 @@
 #SBATCH --gpus=4
 #SBATCH --job-name=LICO_training_imagenet
 #SBATCH --ntasks=1
-#SBATCH --time=80:00:00
+#SBATCH --time=40:00:00
 #SBATCH --output=output/LICO_training_imagenet_%A.out
 
 module purge
@@ -42,7 +42,7 @@ dataset="imagenet"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
 epochs=90
 # For 128, 4 gpu, around 10 min per epoch
-# For 64, 4 gpu, around 10 min per epoch
+# For 32, 4 gpu, around 20 min per epoch
 # 128 / <num_GPU>
 batch_size=32
 workers=8
