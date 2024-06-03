@@ -244,7 +244,7 @@ def train(args):
 
     train_loader, val_loader, _ = create_dataloaders(args)
 
-    total_steps = len(train_loader) * args.epochs
+    total_steps = (len(train_loader) * args.epochs) // args.devices
 
     model = make_model(args, total_steps)
 
