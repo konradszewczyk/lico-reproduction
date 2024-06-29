@@ -40,13 +40,15 @@ code_dir="$HOME/uva_fact_2024"
 dataset="imagenet"
 #data="$code_dir/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
+
+# 12 in paper? not 90?
 epochs=90
 # For 128, 4 gpu, around 10 min per epoch
 # For 32, 4 gpu, around 20 min per epoch
-# 128 / <num_GPU>
-batch_size=32
+# 64 / <num_GPU>
+batch_size=64
 workers=8
-lr=0.03
+lr=0.1
 
 echo "Using alpha $alpha (LICO uses 10.0) and beta $beta (LICO uses 1.0)"
 

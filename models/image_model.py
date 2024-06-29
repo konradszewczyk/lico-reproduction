@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from torch import Tensor
+from torch.optim.lr_scheduler import StepLR
 
 from training_utils import accuracy
 from models.cosine_lr_scheduler import CosineLRScheduler
@@ -86,7 +87,8 @@ class ImageClassificationModel(pl.LightningModule):
         optimizer = torch.optim.SGD(self._model.parameters(), self.lr,
                                     momentum=self.momentum,
                                     weight_decay=self.weight_decay)
-        lr_scheduler = CosineLRScheduler(optimizer, T_max=self.total_steps)
+        lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+        # lr_scheduler = CosineLRScheduler(optimizer, T_max=self.total_steps)
         return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
 
     def get_feature_dim(self):
