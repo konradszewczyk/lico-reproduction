@@ -181,7 +181,7 @@ def create_dataloaders(args):
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **common_args)
 
     val_transforms = transforms.Compose([
-            transforms.Resize(224),
+            transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
