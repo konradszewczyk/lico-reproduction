@@ -89,7 +89,7 @@ class ImageClassificationModel(pl.LightningModule):
                                     weight_decay=self.weight_decay)
         lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
         # lr_scheduler = CosineLRScheduler(optimizer, T_max=self.total_steps)
-        return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+        return [optimizer], [{"scheduler": lr_scheduler, "interval": "epoch"}]
 
     def get_feature_dim(self):
         return self.feature_dim
