@@ -266,7 +266,7 @@ def train(args):
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback, lr_monitor],
         enable_progress_bar=True,
-        logger=WandbLogger(project="lico-reproduction", config=args, log_model=True),
+        logger=WandbLogger(entity="inverse_rl", project="lico-reproduction", config=args, log_model=True),
         gradient_clip_val=args.gradient_clip_val,
         accelerator="gpu",
         devices=args.devices,
