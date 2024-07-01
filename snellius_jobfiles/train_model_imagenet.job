@@ -56,7 +56,7 @@ code_dir="$HOME/uva_fact_2024"
 dataset="imagenet"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
 
-
+# Wandb API key
 set -o allexport
 source "$code_dir/.env"
 set -o allexport
