@@ -14,49 +14,44 @@ module load Anaconda3/2022.05
 # activate the environment
 source activate fact2024
 
-#Run something like this:
-#main.py --seed 1 --arch resnet50 --epochs 100 --batch-size 8
-#--data C:/Users/Mikhail/Datasets/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC
-#--dataset imagenet --lr 0.03 --training-method LICO --workers 2 --context_position end
+# Example
+# cd uva_fact_2024
+# source .env && training_method=baseline arch=resnet18 seed=1 num_devices=1 alpha=0 beta=0 epochs=90 batch_size=256 workers=8 lr=0.1 sbatch --time=25:00:00 snellius_jobfiles/train_model_imagenet.job
 
-# Run this as
-# sbatch train_model_imagenet.job LICO resnet18 1 4 <WANDB_API_KEY>
+# ========= Vars to set =========
+#training_method # LICO or baseline
+#arch # resnet18 or resnet50
+#seed= # 1
+#num_devices= # 1 or 4
+#alpha= # 10 or 0
+#beta= # 1 or 0
+#epochs= # 90
+# effective_batch_size = batch_size * num_devices
+#batch_size= # 64
+#workers= # 8
+#lr= # 0.1
 
-# Positional args
-training_method=$1 # LICO or baseline
-arch=$2 # resnet18 or resnet50
-seed=$3
-num_devices=$4
-WANDB_API_KEY=$5
-alpha=$6
-beta=$7
+VARS=(training_method arch seed num_devices alpha beta epochs batch_size workers lr)
+for var in "${VARS[@]}"; do
+  if [ -z "${!var}" ]; then
+    echo "Error: $var is not set or is empty."
+    exit 1
+  else
+    echo "$var=${!var}"
+  fi
+done
+# ========= Vars to set =========
 
-export WANDB_API_KEY=$WANDB_API_KEY
 
-# Run 1: Visual prompting CLIP on CIFAR-10 with standard text prompt
 code_dir="$HOME/uva_fact_2024"
-
-# Standard constants
 dataset="imagenet"
-#data="$code_dir/imagenet-object-localization-challenge/ILSVRC/Data/CLS-LOC"
 data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
 
-# 12 in paper? not 90?
-epochs=90
-# For 128, 4 gpu, around 10 min per epoch
-# For 32, 4 gpu, around 20 min per epoch
-# 64 / <num_GPU>
-batch_size=64
-workers=8
-lr=0.1
-
-echo "Using alpha $alpha (LICO uses 10.0) and beta $beta (LICO uses 1.0)"
 
 #alpha=10.0
 #beta=1.0
 
 context_position="end"
-
 
 ## Copy the val data to the scratch-shared
 train_root="$data"
@@ -83,18 +78,18 @@ fi
 # Run the experiment
 echo "Running experiment on $dataset with $training_method and batch size $batch_size and seed $seed"
 cd "$code_dir" || exit
-python $code_dir/main.py \
+python "$code_dir/main.py" \
     --dataset $dataset \
     --train_dir "$train_root/train" \
     --val_dir "$val_root/val" \
-    --arch $arch \
-    --epochs $epochs \
-    --training-method $training_method \
-    --alpha $alpha \
-    --beta $beta \
-    --seed $seed \
-    --workers $workers \
-    --lr $lr \
-    --batch-size $batch_size \
+    --arch "$arch" \
+    --epochs "$epochs" \
+    --training-method "$training_method" \
+    --alpha "$alpha" \
+    --beta "$beta" \
+    --seed "$seed" \
+    --workers "$workers" \
+    --lr "$lr" \
+    --batch-size "$batch_size" \
     --devices "$num_devices" \
-    --context_position $context_position
+    --context_position "$context_position"
