@@ -270,7 +270,7 @@ def train(args):
         gradient_clip_val=args.gradient_clip_val,
         accelerator="gpu",
         devices=args.devices,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        strategy=DDPStrategy(find_unused_parameters=True) if args.devices > 1 else "auto",
     )
 
     trainer.fit(model, train_loader, val_loader)
