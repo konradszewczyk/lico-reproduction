@@ -16,7 +16,15 @@ source activate fact2024
 
 # Example
 # cd uva_fact_2024
-# source .env && training_method=baseline arch=resnet18 seed=1 num_devices=1 alpha=0 beta=0 epochs=90 batch_size=256 workers=8 lr=0.1 sbatch --time=25:00:00 snellius_jobfiles/train_model_imagenet.job
+# source .env && sbatch --time=25:00:00 --gpus=1 snellius_jobfiles/train_model_imagenet.job training_method=baseline arch=resnet18 seed=1 num_devices=1 alpha=0 beta=0 epochs=90 batch_size=256 workers=8 lr=0.1
+
+# Parse named arguments
+for arg in "$@"
+do
+    key=$(echo "$arg" | cut -f1 -d=)
+    value=$(echo "$arg" | cut -f2 -d=)
+    eval "${key}='${value}'"
+done
 
 # ========= Vars to set =========
 #training_method # LICO or baseline
