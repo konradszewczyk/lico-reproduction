@@ -39,7 +39,7 @@ done
 #workers= # 8
 #lr= # 0.1
 
-VARS=(training_method arch seed num_devices alpha beta epochs batch_size workers lr)
+VARS=(training_method arch seed num_devices alpha beta epochs batch_size workers lr gradient_clip_val)
 for var in "${VARS[@]}"; do
   if [ -z "${!var}" ]; then
     echo "Error: $var is not set or is empty."
@@ -104,4 +104,5 @@ python "$code_dir/main.py" \
     --lr "$lr" \
     --batch-size "$batch_size" \
     --devices "$num_devices" \
-    --context_position "$context_position"
+    --context_position "$context_position" \
+    --gradient_clip_val "$gradient_clip_val"
