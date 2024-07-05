@@ -4,6 +4,8 @@ import torch.nn as nn
 import clip
 from typing import List
 
+from torch.optim.lr_scheduler import StepLR
+
 from models.LICO_loss import LICOLoss
 from models.cosine_lr_scheduler import CosineLRScheduler
 from training_utils import accuracy
@@ -22,7 +24,8 @@ class LICOModel(pl.LightningModule):
             train_mm_temp: bool,
             num_classes: int = 1,
             enable_cls_prompts: bool = False,
-            context_position: str = 'end'
+            context_position: str = 'end',
+            scheduler_type: str = "cosine",
     ):
         """
         :param image_model: the image model to use for feature extraction nad classification
@@ -30,6 +33,7 @@ class LICOModel(pl.LightningModule):
         :param target_names: a tensor where at index i there is tokenized name of the ith class
         """
         super().__init__()
+        self.scheduler_type = scheduler_type
 
         self.image_model = image_model
         self.text_model, _ = clip.load("ViT-B/32")
@@ -200,8 +204,15 @@ class LICOModel(pl.LightningModule):
             momentum=self.image_model.momentum,
             weight_decay=self.image_model.weight_decay,
         )
-        lr_scheduler = CosineLRScheduler(optimizer, T_max=self.image_model.total_steps)
-        return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+
+        if self.scheduler_type == "cosine":
+            lr_scheduler = CosineLRScheduler(optimizer, T_max=self.image_model.total_steps)
+            return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+        elif self.scheduler_type == "step":
+            lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+            return [optimizer], [{"scheduler": lr_scheduler, "interval": "epoch"}]
+        else:
+            raise ValueError()
 
     def on_save_checkpoint(self, checkpoint):
         # Identify the keys associated with the text_model, which we dont want to save

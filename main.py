@@ -34,7 +34,8 @@ parser.add_argument('--context_tokens', type=int, default=12, help='number of le
 parser.add_argument('--learnable_context', type=bool, default=True, help='whether to train params of context tokens')
 parser.add_argument('--enable_cls_prompts', default=False, action=argparse.BooleanOptionalAction, help='enable trainable prompts per class')
 parser.add_argument('--dynamic_context', type=bool, default=True, help='whether to shuffle trainable context tokens')
-parser.add_argument('--context_position', type=str, default='end', help='part of the prompts where the context tokens should be inserted')
+parser.add_argument('--context_position', type=str, default='end', help='part of the prompts where the context tokens should be inserted (end or front)')
+parser.add_argument('--scheduler_type', type=str, default='cosine', help='cosine or step scheduler')
 
 # parser.add_argument('--data', metavar='DIR', default='data',
 #                     help='path to dataset')
@@ -208,7 +209,8 @@ def make_model(args, total_steps):
             model = ImageClassificationModel(
                 pretrained=args.pretrained, arch=args.arch, lr=args.lr,
                 momentum=args.momentum, weight_decay=args.weight_decay,
-                num_classes=num_classes, total_steps=total_steps
+                num_classes=num_classes, total_steps=total_steps,
+                scheduler_type=args.scheduler_type,
             )
     elif args.training_method == 'LICO':
         target_names = tokenize_targets(TEXT_CLASSES[args.dataset])
@@ -222,13 +224,13 @@ def make_model(args, total_steps):
             image_model = ImageClassificationModel(
                 pretrained=args.pretrained, arch=args.arch, lr=args.lr,
                 momentum=args.momentum, weight_decay=args.weight_decay, num_classes=num_classes,
-                total_steps=total_steps
+                total_steps=total_steps, scheduler_type=args.scheduler_type,
             )
             model = LICOModel(image_model, target_names=target_names,
                               alpha=args.alpha, beta=args.beta, context_tokens=args.context_tokens,
                               learnable_context=args.learnable_context, dynamic_context=args.dynamic_context,
                               train_mm_temp=args.train_mm_temp, enable_cls_prompts=args.enable_cls_prompts, num_classes=num_classes,
-                              context_position=args.context_position)
+                              context_position=args.context_position, scheduler_type=args.scheduler_type)
     else:
         raise NotImplementedError
     return model

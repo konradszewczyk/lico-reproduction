@@ -28,11 +28,13 @@ def features_forward(model, x):
 
 
 class ImageClassificationModel(pl.LightningModule):
-    def __init__(self, pretrained, arch, lr, momentum, weight_decay, num_classes, total_steps):
+    def __init__(self, pretrained, arch, lr, momentum, weight_decay, num_classes, total_steps, scheduler_type):
         super().__init__()
 
         print(f"=> {'using pre-trained' if pretrained else 'creating'} model {arch}")
         self._model = models.__dict__[arch](pretrained=pretrained)
+
+        self.scheduler_type = scheduler_type
 
         assert 'resnet' in arch, 'Only resnet architectures are supported'
         if arch == 'resnet18':
@@ -87,9 +89,14 @@ class ImageClassificationModel(pl.LightningModule):
         optimizer = torch.optim.SGD(self._model.parameters(), self.lr,
                                     momentum=self.momentum,
                                     weight_decay=self.weight_decay)
-        lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
-        # lr_scheduler = CosineLRScheduler(optimizer, T_max=self.total_steps)
-        return [optimizer], [{"scheduler": lr_scheduler, "interval": "epoch"}]
+        if self.scheduler_type == "cosine":
+            lr_scheduler = CosineLRScheduler(optimizer, T_max=self.total_steps)
+            return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+        elif self.scheduler_type == "step":
+            lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+            return [optimizer], [{"scheduler": lr_scheduler, "interval": "epoch"}]
+        else:
+            raise ValueError()
 
     def get_feature_dim(self):
         return self.feature_dim
