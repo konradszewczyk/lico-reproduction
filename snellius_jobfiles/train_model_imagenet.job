@@ -39,7 +39,7 @@ done
 #workers= # 8
 #lr= # 0.1
 
-VARS=(training_method arch seed num_devices alpha beta epochs batch_size workers lr gradient_clip_val scheduler_type)
+VARS=(training_method arch seed num_devices alpha beta epochs batch_size workers lr scheduler_type)
 for var in "${VARS[@]}"; do
   if [ -z "${!var}" ]; then
     echo "Error: $var is not set or is empty."
@@ -90,20 +90,26 @@ fi
 # Run the experiment
 echo "Running experiment on $dataset with $training_method and batch size $batch_size and seed $seed"
 cd "$code_dir" || exit
-python "$code_dir/main.py" \
-    --dataset $dataset \
-    --train_dir "$train_root/train" \
-    --val_dir "$val_root/val" \
-    --arch "$arch" \
-    --epochs "$epochs" \
-    --training-method "$training_method" \
-    --alpha "$alpha" \
-    --beta "$beta" \
-    --seed "$seed" \
-    --workers "$workers" \
-    --lr "$lr" \
-    --batch-size "$batch_size" \
-    --devices "$num_devices" \
-    --context_position "$context_position" \
-    --gradient_clip_val "$gradient_clip_val" \
-    --scheduler_type "$scheduler_type"
+
+cmd="python \"$code_dir/main.py\""
+
+# Append flags only if the variables are not empty
+[ -n "$dataset" ] && cmd+=" --dataset $dataset"
+[ -n "$train_root" ] && cmd+=" --train_dir \"$train_root/train\""
+[ -n "$val_root" ] && cmd+=" --val_dir \"$val_root/val\""
+[ -n "$arch" ] && cmd+=" --arch \"$arch\""
+[ -n "$epochs" ] && cmd+=" --epochs \"$epochs\""
+[ -n "$training_method" ] && cmd+=" --training-method \"$training_method\""
+[ -n "$alpha" ] && cmd+=" --alpha \"$alpha\""
+[ -n "$beta" ] && cmd+=" --beta \"$beta\""
+[ -n "$seed" ] && cmd+=" --seed \"$seed\""
+[ -n "$workers" ] && cmd+=" --workers \"$workers\""
+[ -n "$lr" ] && cmd+=" --lr \"$lr\""
+[ -n "$batch_size" ] && cmd+=" --batch-size \"$batch_size\""
+[ -n "$num_devices" ] && cmd+=" --devices \"$num_devices\""
+[ -n "$context_position" ] && cmd+=" --context_position \"$context_position\""
+[ -n "$gradient_clip_val" ] && cmd+=" --gradient_clip_val \"$gradient_clip_val\""
+[ -n "$scheduler_type" ] && cmd+=" --scheduler_type \"$scheduler_type\""
+
+# Execute the command
+eval "$cmd"
