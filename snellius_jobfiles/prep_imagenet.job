@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu
+#SBATCH --gpus=1
+#SBATCH --job-name=prep_imagenet
+#SBATCH --ntasks=1
+#SBATCH --time=00:30:00
+#SBATCH --output=output/prep_imagenet_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+
+# activate the environment
+source activate fact2024
+
+
+code_dir="$HOME/uva_fact_2024"
+dataset="imagenet"
+data="/scratch-nvme/ml-datasets/imagenet/ILSVRC/Data/CLS-LOC"
+
+
+## Copy the val data to the scratch-shared
+val_root="/scratch-shared/$USER"
+data_dest=$val_root
+
+# Create the destination directory if it doesn't exist
+mkdir -p "$val_root"
+
+# Check if the destination directory exists and is not empty
+if [ -d "$data_dest" ] && [ "$(ls -A $data_dest)" ]; then
+    echo "Data already exists at $data_dest. Skipping copy."
+else
+    echo "Copying dataset $data/val to $data_dest"
+    rsync --info=progress2 -r "$data/val" "$data_dest"
+
+    # Fix structure of val set
+    echo "Fixing val set dir structure"
+    cd "$data_dest/val" || exit
+    wget -qO- https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh | bash
+fi
