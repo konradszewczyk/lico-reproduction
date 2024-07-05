@@ -1,7 +1,6 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu
-#SBATCH --gpus=1
+#SBATCH --partition=rome
 #SBATCH --job-name=prep_imagenet
 #SBATCH --ntasks=1
 #SBATCH --time=00:30:00
